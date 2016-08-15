@@ -1,0 +1,3 @@
+[run]
+source = bndl_cassandra
+parallel = True

@@ -1,0 +1,13 @@
+.settings
+scratch
+
+.eggs
+*.egg-info
+dist
+build
+htmlcov
+.coverage
+.coverage.*
+
+.cache
+*.log
