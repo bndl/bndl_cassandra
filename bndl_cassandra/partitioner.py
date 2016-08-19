@@ -1,7 +1,11 @@
+from bisect import bisect_left, bisect
+from itertools import chain
 from operator import itemgetter
 import copy
+import math
 
 from bndl.util.collection import sortgroupby
+from cytoolz import itertoolz, functoolz
 
 
 T_COUNT = 2 ** 64
@@ -20,105 +24,127 @@ def get_token_ranges(ring):
     return list(zip(ring[:-1], ring[1:]))
 
 
-def repartition(partitions, min_pcount):
-    while len(partitions) < min_pcount:
-        repartitioned = []
-        for replicas, token_ranges in partitions:
-            if len(token_ranges) == 1:
-                repartitioned.append((replicas, token_ranges))
-                continue
-            mid = len(token_ranges) // 2
-            repartitioned.append((replicas, token_ranges[:mid]))
-            repartitioned.append((replicas, token_ranges[mid:]))
-        if len(repartitioned) == len(partitions):
-            break
-        partitions = repartitioned
-    return partitions
+def replicas_for_token(keyspace, token_map, token):
+    replicas = token_map.get_replicas(keyspace, token_map.token_class(token))
+    return tuple(replica.address for replica in replicas)
 
 
-def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
-    min_pcount = ctx.default_pcount
-    part_size_keys = ctx.conf.get('bndl_cassandra.part_size_mb')
-    part_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
-
-    # fall back to default size bounds
-    if part_size_keys is None:
-        from bndl_cassandra import part_size_keys as psk
-        part_size_keys = psk.default,
-    if part_size_mb is None:
-        from bndl_cassandra import part_size_keys as psm
-        part_size_mb = psm.default
-
-    # estimate size of table
-    size_estimate = size_estimates or estimate_size(session, keyspace, table)
-
+def ranges_by_replicas(session, keyspace):
     # get raw ranges from token ring
     token_map = session.cluster.metadata.token_map
     raw_ranges = get_token_ranges(token_map.ring)
 
     # group by replica
-    by_replicas = sortgroupby(
-        (
-            (set(replica.address for replica in token_map.get_replicas(keyspace, token_map.token_class(start))),
-             start, end)
-            for start, end in raw_ranges
-        ), itemgetter(0)
-    )
+    return itertoolz.groupby(0, (
+        (replicas_for_token(keyspace, token_map, start), start, end)
+        for start, end in raw_ranges
+    ))
 
-    # divide the token ranges in partitions
-    # joining ranges for the same replica set
-    # but limited in size (in bytes and Cassandra partition keys)
-    partitions = []
-    current_ranges = []
-    current_ranges_size_mb = 0
-    current_ranges_size_keys = 0
 
-    for replicas, ranges in by_replicas:
-        ranges = list(ranges)
-        for _, start, end in ranges:
-            length = end - start
-            size_b = length * size_estimate.token_size_b
-            size_pk = length * size_estimate.token_size_pk
+class Bin(object):
+    def __init__(self):
+        self.ranges = []
+        self.size = 0
 
-            current_ranges_size_mb += (size_b / 1024. / 1024.)
-            current_ranges_size_keys += size_pk
 
-            if current_ranges_size_mb > part_size_mb or current_ranges_size_keys > part_size_keys:
-                # possibly a single token range exceeds our limits
-                # TODO split that range into chunks within our limits
-                if current_ranges:
-                    partitions.append((replicas, current_ranges))
-                current_ranges = []
-                current_ranges_size_mb = 0
-                current_ranges_size_keys = 0
+def partition_ranges_(ranges, max_length, size_estimate):
+    # split ranges such that they are small enough
+    # ranges which need to be split are yielded immediately, they'd fill a bin anyway
+    # the ranges smaller than max_length are put into a list for binning
+    # and sorted larger > smaller (First Fit Decreasing strategy)
+    sorted_ranges = []
+    for start, end in ranges:
+        length = end - start
+        if length > max_length:
+            parts = int((length - 1) / max_length)
+            step = math.ceil(length / (parts + 1))
+            for i in range(parts):
+                yield [(start, start + step)], step
+                start = start + step
+            yield [(start, end)], end - start
+        else:
+            sorted_ranges.append((start, end, length))
+    # EXPERIMENT, change sort
+    sorted_ranges.sort(key=itemgetter(2))
 
-            current_ranges.append((start, end))
+    # container for the bins for this replica set
+    bins = [Bin()]
 
-        if current_ranges:
-            partitions.append((replicas, current_ranges))
-            current_ranges = []
-            current_ranges_size_mb = 0
-            current_ranges_size_keys = 0
+    # build one big partition out of the ranges for this replica set
+    for start, end, length in sorted_ranges:
+        bin = bins[0]
+        # see if it fits in the first (least loaded bin)
+        if bin.size + length > max_length:
+            # create a new bin if none found
+            bin = Bin()
+            bins.append(bin)
+        # add the token range to the bin
+        bin.ranges.append((start, end))
+        bin.size += length
 
-    if min_pcount:
-        return repartition(partitions, min_pcount)
+        # sort the bins so that the least loaded bin is the first candidate
+        # EXPERIMENT turn this on or off
+        bins.sort(key=lambda bin: bin.size)
+
+    for bin in bins:
+        if bin.size:
+            yield bin.ranges, bin.size
+
+
+def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
+    # estimate size of table
+    size_estimate = size_estimates or estimate_size(session, keyspace, table)
+
+    # calculate a maximum length of a partition
+    # while the ratio of size in megabytes and keys may vary across the tokens
+    # we use the average sizes per token for both to simplify the problem
+    # to 1d bin packing (instead of vector bin packing)
+    max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
+    max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
+    if size_estimate.table_size_pk == 0:
+        max_length = T_COUNT / ctx.default_pcount
     else:
-        return partitions
+        max_length = min(
+            max_size_mb / size_estimate.token_size_mb,
+            max_size_keys / size_estimate.token_size_keys,
+            T_COUNT / ctx.default_pcount
+        )
+
+    # get token ranges, grouped by replica set
+    by_replicas = ranges_by_replicas(session, keyspace)
+
+    # container for the partitions (replica, ranges, size_mb, size_keys)
+    partitions = []
+
+    # divide the token ranges in partitions, joining ranges for the same replica set
+    # but limited in size (in bytes and Cassandra partition keys)
+    # A greedy bin packing algorithm is used
+
+    for replicas, ranges in sorted(by_replicas.items(), key=itemgetter(0)):
+        ranges = itertoolz.pluck([1, 2], ranges)
+        for ranges, size in partition_ranges_(ranges, max_length, size_estimate):
+            partitions.append((
+                replicas, ranges,
+                size * size_estimate.token_size_mb,
+                size * size_estimate.token_size_keys
+            ))
+
+    return partitions
 
 
 
 class SizeEstimate(object):
     def __init__(self, size, partitions, fraction):
         if fraction:
-            self.table_size_b = int(size / fraction)
+            self.table_size_mb = int(size / fraction)
             self.table_size_pk = int(partitions / fraction)
-            self.token_size_b = float(self.table_size_b) / T_COUNT
-            self.token_size_pk = float(self.table_size_pk) / T_COUNT
+            self.token_size_mb = float(self.table_size_mb) / T_COUNT
+            self.token_size_keys = float(self.table_size_pk) / T_COUNT
         else:
-            self.table_size_b = 0
+            self.table_size_mb = 0
             self.table_size_pk = 0
-            self.token_size_b = 0
-            self.token_size_pk = 0
+            self.token_size_mb = 0
+            self.token_size_keys = 0
 
     def __add__(self, other):
         est = copy.copy(self)
@@ -126,18 +152,18 @@ class SizeEstimate(object):
         return est
 
     def __iadd__(self, other):
-        self.table_size_b += other.table_size_b
+        self.table_size_mb += other.table_size_mb
         self.table_size_pk += other.table_size_pk
-        self.token_size_pk = (self.token_size_pk + other.token_size_pk) / 2
-        self.token_size_b = (self.token_size_b + other.token_size_b) / 2
+        self.token_size_keys = (self.token_size_keys + other.token_size_keys) / 2
+        self.token_size_mb = (self.token_size_mb + other.token_size_mb) / 2
         return self
 
     def __repr__(self):
-        return '<SizeEstimate: size=%s, partitions=%s, partitions / token=%s, tokensize=%s>' % (
-            self.table_size_b / 1024. / 1024.,
+        return '<SizeEstimate: size=%s, partitions=%s, partitions / token=%s, token size=%s>' % (
+            self.table_size_mb,
             self.table_size_pk,
-            self.token_size_pk,
-            self.token_size_b
+            self.token_size_keys,
+            self.token_size_mb
         )
 
 
@@ -164,11 +190,11 @@ def estimate_size(session, keyspace, table):
             # don't bother unwrapping the token range crossing 0
             if start > end:
                 continue
-            # count partitions, bytes and size of the range
+            # count partitions, bytes and size of the token range
             size_pk += range_estimate.partitions_count
             size_b += range_estimate.mean_partition_size * range_estimate.partitions_count
             tokens += int(range_estimate.range_end) - int(range_estimate.range_start)
 
     fraction = tokens / T_COUNT
 
-    return SizeEstimate(size_b, size_pk, fraction)
+    return SizeEstimate(size_b / 1024 / 1024, size_pk, fraction)

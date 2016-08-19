@@ -9,6 +9,7 @@ from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
+import functools
 
 
 logger = logging.getLogger(__name__)
@@ -103,14 +104,14 @@ class CassandraScanDataset(Dataset):
         return CassandraCoScanDataset(self, other, keys=keys)
 
 
-
+    @functools.lru_cache(1)
     def parts(self):
         with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
             partitions = partitioner.partition_ranges(self.ctx, session, self.keyspace, self.table)
 
         return [
-            CassandraScanPartition(self, i, replicas, token_ranges)
-            for i, (replicas, token_ranges) in enumerate(partitions)
+            CassandraScanPartition(self, i, *part)
+            for i, part in enumerate(partitions)
         ]
 
 
@@ -133,10 +134,12 @@ class CassandraScanDataset(Dataset):
 
 
 class CassandraScanPartition(Partition):
-    def __init__(self, dset, part_idx, replicas, token_ranges):
+    def __init__(self, dset, part_idx, replicas, token_ranges, size_estimate_mb, size_estimate_keys):
         super().__init__(dset, part_idx)
-        self.replicas = replicas
+        self.replicas = set(replicas)
         self.token_ranges = token_ranges
+        self.size_estimate_mb = size_estimate_mb
+        self.size_estimate_keys = size_estimate_keys
 
 
     def _fetch_token_range(self, session, token_range):
