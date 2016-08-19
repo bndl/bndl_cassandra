@@ -20,7 +20,7 @@ read_retry_backoff = Float(2, desc='delay = {read_timeout_backoff} ^ retry_round
 read_timeout = Int(120)
 read_consistency_level = Attr(ConsistencyLevel.LOCAL_ONE, obj=ConsistencyLevel)
 fetch_size_rows = Int(1000)
-part_size_keys = Int(1000 * 1000)
+part_size_keys = Int(100 * 1000)
 part_size_mb = Int(64)
 
 write_retry_count = Int(0)
