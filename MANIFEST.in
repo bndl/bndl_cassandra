@@ -1,1 +1,2 @@
+include README.md
 recursive-include bndl_cassandra *.html

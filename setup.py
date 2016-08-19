@@ -24,6 +24,7 @@ setup(
     zip_safe=False,
 
     install_requires=[
+        'bndl',
         'cassandra-driver',
         'lz4',
         'scales',
