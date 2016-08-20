@@ -1,11 +1,8 @@
-from bisect import bisect_left, bisect
-from itertools import chain
 from operator import itemgetter
 import copy
 import math
 
-from bndl.util.collection import sortgroupby
-from cytoolz import itertoolz, functoolz
+from cytoolz import itertoolz
 
 
 T_COUNT = 2 ** 64
@@ -58,14 +55,14 @@ def partition_ranges_(ranges, max_length, size_estimate):
         if length > max_length:
             parts = int((length - 1) / max_length)
             step = math.ceil(length / (parts + 1))
-            for i in range(parts):
+            for _ in range(parts):
                 yield [(start, start + step)], step
                 start = start + step
             yield [(start, end)], end - start
         else:
             sorted_ranges.append((start, end, length))
-    # EXPERIMENT, change sort
-    sorted_ranges.sort(key=itemgetter(2))
+    # Sort biggest first
+    sorted_ranges.sort(key=itemgetter(2), reverse=True)
 
     # container for the bins for this replica set
     bins = [Bin()]
@@ -83,7 +80,6 @@ def partition_ranges_(ranges, max_length, size_estimate):
         bin.size += length
 
         # sort the bins so that the least loaded bin is the first candidate
-        # EXPERIMENT turn this on or off
         bins.sort(key=lambda bin: bin.size)
 
     for bin in bins:
