@@ -97,14 +97,11 @@ def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
     # to 1d bin packing (instead of vector bin packing)
     max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
     max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
-    if size_estimate.table_size_pk == 0:
-        max_length = T_COUNT / ctx.default_pcount
-    else:
-        max_length = min(
-            max_size_mb / size_estimate.token_size_mb,
-            max_size_keys / size_estimate.token_size_keys,
-            T_COUNT / ctx.default_pcount
-        )
+    max_length = T_COUNT / ctx.default_pcount
+    if size_estimate.token_size_mb:
+        max_length = min(max_length, max_size_mb / size_estimate.token_size_mb)
+    if size_estimate.token_size_keys:
+        max_length = min(max_length, max_size_keys / size_estimate.token_size_keys)
 
     # get token ranges, grouped by replica set
     by_replicas = ranges_by_replicas(session, keyspace)
