@@ -3,8 +3,6 @@ import difflib
 import functools
 import logging
 
-from bndl.compute.dataframes import DataFrame, DistributedDataFrame, \
-    combine_dataframes
 from bndl.compute.dataset import Dataset, Partition
 from bndl.util import funcs
 from bndl.util.retry import do_with_retry
@@ -120,6 +118,8 @@ class CassandraScanDataset(Dataset):
                         2015-01-31 06:29:07.937         7
         '''
         import pandas as pd
+        from bndl.compute.dataframes import DataFrame, DistributedDataFrame, \
+                                            combine_dataframes
 
         if self._select:
             pk_cols_selected = [c.name for c in self.meta.primary_key if c.name in self._select]
