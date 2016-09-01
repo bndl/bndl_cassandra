@@ -93,23 +93,52 @@ class CassandraScanDataset(Dataset):
         return self._with(_row_factory=dict_factory)
 
     def as_dataframe(self):
+        '''
+        Create a bndl.compute.dataframe.DistributedDataFrame out of a Cassandra
+        table scan.
+
+        When primary key fields are selected, they are used to compose a
+        (multilevel) index.
+
+        Example::
+
+            >>> df = ctx.cassandra_table('ks', 'tbl').as_dataframe()
+            >>> df.collect()
+                                                 comments
+            id          timestamp
+            ZIJr6BDGCeo 2014-10-09 19:28:43.657         1
+                        2015-01-12 20:24:49.947         4
+                        2015-01-13 02:24:30.931         39
+            kxcT9VOI0oU 2015-01-12 14:24:16.378         1
+                        2015-01-12 20:24:49.947         5
+                        2015-01-13 02:24:30.931         8
+                        2015-02-04 10:29:58.118         4
+            A_egyclRPOw 2015-12-16 13:50:53.210         1
+                        2015-01-18 18:28:19.556         2
+                        2015-01-22 22:28:33.358         4
+                        2015-01-27 02:28:59.578         6
+                        2015-01-31 06:29:07.937         7
+        '''
         import pandas as pd
 
-        primary_key = [c.name for c in self.meta.primary_key if not self._select or c.name in self._select]
+        if self._select:
+            pk_cols_selected = [c.name for c in self.meta.primary_key if c.name in self._select]
+        else:
+            pk_cols_selected = [c.name for c in self.meta.primary_key]
 
         # creates dicts with column names and numpy arrays per query page
         arrays = self._with(_row_factory=tuple_factory, _protocol_handler='NumpyProtocolHandler')
 
         # converts each dict of numpy arrays (a query page) to a pandas dataframe
         def to_df(arrays):
-            if len(primary_key) == 0:
+            if len(pk_cols_selected) == 0:
                 index = None
-            elif len(primary_key) == 1:
-                name = primary_key[0]
+            elif len(pk_cols_selected) == 1:
+                name = pk_cols_selected[0]
                 index = pd.Index(arrays.pop(name), name=name)
             else:
-                index = [arrays.pop(name) for name in primary_key]
-                index = pd.MultiIndex.from_arrays(index, names=primary_key)
+                index = [arrays.pop(name) for name in pk_cols_selected]
+                index = pd.MultiIndex.from_arrays(index, names=pk_cols_selected)
             return DataFrame(arrays, index)
 
         # creates one df per partition
@@ -121,6 +150,77 @@ class CassandraScanDataset(Dataset):
 
         # create the DDF
         return DistributedDataFrame.from_sample(arrays.map_partitions(as_df), sample)
+
+
+    def span_by(self, *cols):
+        '''
+        Span by groups rows in a Cassandra table scan by a subset of the
+        primary key.
+
+        This is useful for tables with clustering columns: rows in a
+        cassandra table scan are returned clustered by partition key
+        and sorted by clustering columns. This is exploited to efficiently
+        (without shuffle) group rows by a part of the primary key.
+
+        Example::
+
+            >>> tbl = ctx.cassandra_table('ks', 'tbl')
+            >>> tbl.span_by().collect()
+            [('ZIJr6BDGCeo',                       comments
+              id          timestamp
+              ZIJr6BDGCeo 2014-10-09 19:28:43.657         1
+                          2015-01-12 20:24:49.947         4
+                          2015-01-13 02:24:30.931         9),
+             ('kxcT9VOI0oU',                       comments
+              id          timestamp
+              kxcT9VOI0oU 2015-01-12 14:24:16.378         1
+                          2015-01-12 20:24:49.947         2
+                          2015-01-13 02:24:30.931         5
+                          2015-02-04 10:29:58.118         8),
+             ('A_egyclRPOw',                       comments
+              id          timestamp
+              A_egyclRPOw 2015-12-16 13:50:53.210         1
+                          2015-01-18 18:28:19.556         2
+                          2015-01-22 22:28:33.358         4
+                          2015-01-27 02:28:59.578         6
+                          2015-01-31 06:29:07.937         7)]
+
+        A Cassandra table scan spanned by part of the primary key consists of
+        pandas.DataFrame objects, and thus allows for easy per group analysis.
+
+            >>> for key, count in tbl.span_by().map_values(lambda e: e.count()).collect():
+            ...     print(key, ':', count)
+            ...
+            ZIJr6BDGCeo : comments    3
+            dtype: int64
+            kxcT9VOI0oU : comments    4
+            dtype: int64
+            A_egyclRPOw : comments    5
+            dtype: int64
+        '''
+
+        pk_cols = [c.name for c in self.meta.primary_key]
+
+        if not cols:
+            cols = pk_cols[:-1]
+        else:
+            if not all(col in pk_cols for col in cols):
+                raise ValueError('Can only span a cassandra table scan by '
+                                 'columns from the primary key')
+        if self._select:
+            if len(self._select) < len(cols):
+                raise ValueError('Span by on a Cassandra table requires at '
+                                 'least selection of the partition key')
+            elif not all(a == b for a, b in zip(self._select, cols)):
+                raise ValueError('The columns to span by should have the same '
+                                 'order as those selected')
+        if not all(a == b for a, b in zip(pk_cols, cols)) or \
+           len(cols) >= len(pk_cols):
+            raise ValueError('The columns to span by should be a subset '
+                             'of and have the same order as primary key')
+
+        levels = list(range(len(cols)))
+        return self.as_dataframe().map_partitions(lambda part: part.groupby(level=levels))
 
 
     def select(self, *columns):
