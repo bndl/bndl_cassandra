@@ -29,9 +29,14 @@ class ReadTest(CassandraTest):
         self.assertEqual(type(tuples.first()), tuple)
 
     def test_collect_dataframe(self):
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest('Pandas not installed')
         df = self.ctx.cassandra_table(self.keyspace, self.table).as_dataframe()
         self.assertEqual(len(df.collect()), len(self.rows))
-        self.assertEqual(type(df.first()), tuple)
+        self.assertIsInstance(df.first(), tuple)
+        self.assertIsInstance(df.take(3), pd.DataFrame)
 
     # TODO def test_select(self):
     # TODO def test_where(self):
