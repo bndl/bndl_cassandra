@@ -28,6 +28,11 @@ class ReadTest(CassandraTest):
         self.assertEqual(len(tuples.collect()), len(self.rows))
         self.assertEqual(type(tuples.first()), tuple)
 
+    def test_collect_dataframe(self):
+        df = self.ctx.cassandra_table(self.keyspace, self.table).as_dataframe()
+        self.assertEqual(len(df.collect()), len(self.rows))
+        self.assertEqual(type(df.first()), tuple)
+
     # TODO def test_select(self):
     # TODO def test_where(self):
 

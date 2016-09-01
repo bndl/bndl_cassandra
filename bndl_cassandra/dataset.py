@@ -1,15 +1,18 @@
 from functools import partial
 import difflib
+import functools
 import logging
 
+from bndl.compute.dataframes import DataFrame, DistributedDataFrame, \
+    combine_dataframes
 from bndl.compute.dataset import Dataset, Partition
 from bndl.util import funcs
 from bndl.util.retry import do_with_retry
 from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
+from cassandra import protocol
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
-import functools
 
 
 logger = logging.getLogger(__name__)
@@ -57,9 +60,7 @@ class CassandraScanDataset(Dataset):
         self.table = table
         self.contact_points = contact_points
         self._row_factory = named_tuple_factory
-
-        with ctx.cassandra_session(contact_points=self.contact_points) as session:
-            table_meta = get_table_meta(session, self.keyspace, self.table)
+        self._protocol_handler = None
 
         self._select = None
         self._limit = None
@@ -67,8 +68,15 @@ class CassandraScanDataset(Dataset):
             token({partition_key_column_names}) > ? and
             token({partition_key_column_names}) <= ?
         '''.format(
-            partition_key_column_names=', '.join(c.name for c in table_meta.partition_key)
+            partition_key_column_names=', '.join(c.name for c in self.meta.partition_key)
         )
+
+
+    @property
+    @functools.lru_cache(1)
+    def meta(self):
+        with self.ctx.cassandra_session(contact_points=self.contact_points) as session:
+            return get_table_meta(session, self.keyspace, self.table)
 
 
     def count(self, push_down=None):
@@ -79,18 +87,48 @@ class CassandraScanDataset(Dataset):
 
 
     def as_tuples(self):
-        return self._with('_row_factory', tuple_factory)
+        return self._with(_row_factory=tuple_factory)
 
     def as_dicts(self):
-        return self._with('_row_factory', dict_factory)
+        return self._with(_row_factory=dict_factory)
+
+    def as_dataframe(self):
+        import pandas as pd
+
+        primary_key = [c.name for c in self.meta.primary_key if not self._select or c.name in self._select]
+
+        # creates dicts with column names and numpy arrays per query page
+        arrays = self._with(_row_factory=tuple_factory, _protocol_handler='NumpyProtocolHandler')
+
+        # converts each dict of numpy arrays (a query page) to a pandas dataframe
+        def to_df(arrays):
+            if len(primary_key) == 0:
+                index = None
+            elif len(primary_key) == 1:
+                name = primary_key[0]
+                index = pd.Index(arrays.pop(name), name=name)
+            else:
+                index = [arrays.pop(name) for name in primary_key]
+                index = pd.MultiIndex.from_arrays(index, names=primary_key)
+            return DataFrame(arrays, index)
+
+        # creates one df per partition
+        def as_df(part):
+            return combine_dataframes(to_df(arrays) for arrays in part)
+
+        # take first to get meta data
+        sample = next(arrays.limit(1).map_partitions(as_df).icollect(eager=False, parts=True))
+
+        # create the DDF
+        return DistributedDataFrame.from_sample(arrays.map_partitions(as_df), sample)
+
 
     def select(self, *columns):
-        return self._with('_select', columns)
+        return self._with(_select=columns)
 
 
     def limit(self, num):
-        wlimit = self._with('_limit', int(num))
-        return wlimit
+        return self._with(_limit=int(num))
 
     def itake(self, num):
         if not self.cached and not self._limit:
@@ -171,15 +209,19 @@ class CassandraScanPartition(Partition):
         retry_backoff = ctx.conf.get('bndl_cassandra.read_retry_backoff')
 
         with ctx.cassandra_session(contact_points=self.dset.contact_points) as session:
+            old_row_factory = session.row_factory
+            old_protocol_handler = session.client_protocol_handler
             try:
-                old_row_factory = session.row_factory
                 session.row_factory = self.dset._row_factory
+                if self.dset._protocol_handler:
+                    session.client_protocol_handler = getattr(protocol, self.dset._protocol_handler)
                 logger.debug('scanning %s token ranges with query %s', len(self.token_ranges))
                 for token_range in self.token_ranges:
                     yield from do_with_retry(partial(self._fetch_token_range, session, token_range),
                                              retry_count, retry_backoff, TRANSIENT_ERRORS)
             finally:
                 session.row_factory = old_row_factory
+                session.client_protocol_handler = old_protocol_handler
 
 
     def _preferred_workers(self, workers):
