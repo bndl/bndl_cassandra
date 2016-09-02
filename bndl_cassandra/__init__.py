@@ -15,7 +15,7 @@ keyspace = String()
 compression = Bool(True)
 metrics_enabled = Bool(True)
 
-read_retry_count = Int(10)
+read_retry_count = Int(3)
 read_retry_backoff = Float(2, desc='delay = {read_timeout_backoff} ^ retry_round - 1')
 read_timeout = Int(120)
 read_consistency_level = Attr(ConsistencyLevel.LOCAL_ONE, obj=ConsistencyLevel)
@@ -23,10 +23,10 @@ fetch_size_rows = Int(1000)
 part_size_keys = Int(100 * 1000)
 part_size_mb = Int(64)
 
-write_retry_count = Int(0)
+write_retry_count = Int(3)
 write_retry_backoff = Float(2, desc='delay = {write_timeout_backoff} ^ retry_round - 1')
 write_timeout = Int(120)
-write_concurrency = Int(5)
+write_concurrency = Int(2)
 write_consistency_level = Attr(ConsistencyLevel.LOCAL_QUORUM, obj=ConsistencyLevel)
 
 
