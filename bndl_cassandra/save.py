@@ -90,9 +90,9 @@ def execute_save(ctx, statement, iterable, contact_points=None):
 
         for idx, element in enumerate(iterable):
             with cond:
+                cond.wait_for(lambda: pending < concurrency)
                 if failure:
                     raise failure
-                cond.wait_for(lambda: pending < concurrency)
                 pending += 1
             exec_async(idx, element)
 
