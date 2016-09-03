@@ -51,10 +51,6 @@ def combine_metrics(metrics1, metrics2):
     metrics1['known_hosts'] += metrics2['known_hosts']
     metrics1['connected_to'] += metrics2['connected_to']
     metrics1['open_connections'] += metrics2['open_connections']
-    # summing them doesn't make that much sense, nor does taking the max
-    metrics1['connected_to'] /= 2
-    metrics1['known_hosts'] /= 2
-    metrics1['open_connections'] /= 2
 
     request_timer1 = metrics1['request_timer']
     request_timer2 = metrics2['request_timer']
@@ -66,6 +62,7 @@ def combine_metrics(metrics1, metrics2):
                                   (request_timer1['count'] + request_timer2['count'])
         # work back to variances, add them and take the square root to get back to the combined stdev
         # based on http://mathbench.umd.edu/modules/statistical-tests_t-tests/page05.htm
+    if all((request_timer1['count'], request_timer2['count'])):
         request_timer1['stddev'] = math.sqrt(request_timer1['stddev'] ** 2 / request_timer1['count'] +
                                              request_timer2['stddev'] ** 2 / request_timer2['count'])
     # take min of min and max of max

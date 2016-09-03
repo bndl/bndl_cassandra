@@ -39,36 +39,15 @@ Cassandra dashboard
 								</tr>
 								<tr>
 									<th>Known hosts</th>
-									<td>
-										{% if metrics.known_hosts % 1 == 0 %}
-											{{ metrics.known_hosts|int }}
-										{% else %}
-											{{ metrics.known_hosts }}
-											<span class="glyphicon glyphicon-flash"></span>
-										{% endif %}
-									</td>
+									<td>{{ metrics.known_hosts }}</td>
 								</tr>
 								<tr>
 									<th>Hosts connected to</th>
-									<td>
-										{% if metrics.connected_to % 1 == 0 %}
-											{{ metrics.connected_to|int }}
-										{% else %}
-											{{ metrics.connected_to }}
-											<span class="glyphicon glyphicon-flash"></span>
-										{% endif %}
-									</td>
+									<td>{{ metrics.connected_to }}</td>
 								</tr>
 								<tr>
 									<th>Open connections</th>
-									<td>
-										{% if metrics.open_connections % 1 == 0 %}
-											{{ metrics.open_connections|int }}
-										{% else %}
-											{{ metrics.open_connections }}
-											<span class="glyphicon glyphicon-flash"></span>
-										{% endif %}
-									</td>
+									<td>{{ metrics.open_connections }}</td>
 								</tr>
 							</tbody>
 						</table>
