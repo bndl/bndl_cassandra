@@ -2,7 +2,7 @@ from bndl_cassandra.tests import CassandraTest
 
 
 class SaveTest(CassandraTest):
-    num_rows = 10000
+    num_rows = 1000
 
     def setUp(self):
         super().setUp()
@@ -37,3 +37,28 @@ class SaveTest(CassandraTest):
                        .select('key', 'cluster', 'varint_val').as_tuples().collect()
         self.assertEqual(len(rows), len(dset.collect()))
         self.assertEqual(sorted(rows, key=lambda row: int(row[0])), dset.collect())
+
+
+    def test_save_batches(self):
+        dset = self.ctx.range(self.num_rows).map(lambda i: (str(i // 100), str(i), i))
+        for batch_key in ('none', 'replica_set', 'partition_key'):
+            self.truncate()
+            self.ctx.conf['bndl_cassandra.write_batch_key'] = batch_key
+            self.ctx.conf['bndl_cassandra.write_batch_size'] = 20
+            self.ctx.conf['bndl_cassandra.write_batch_buffer_size'] = 20
+
+            saved = (dset.cassandra_save(
+                self.keyspace, self.table,
+                columns=('key', 'cluster', 'varint_val'),
+                keyed_rows=False
+            ).sum())
+
+            self.assertEqual(saved, self.num_rows)
+            self.assertEqual(self.ctx.cassandra_table(self.keyspace, self.table).count(push_down=True), self.num_rows)
+
+            rows = self.ctx.cassandra_table(self.keyspace, self.table) \
+                           .select('key', 'cluster', 'varint_val').as_tuples().collect()
+            self.assertEqual(len(rows), len(dset.collect()))
+            key = lambda row: (int(row[0]), row[1])
+            rows.sort(key=key)
+            self.assertEqual(rows, dset.sort(key).collect())

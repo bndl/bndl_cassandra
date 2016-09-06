@@ -8,6 +8,7 @@ import logging
 from bndl.util.retry import retry_delay
 from bndl.util.timestamps import ms_timestamp
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
+from cassandra.query import BatchStatement, BatchType
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,54 @@ INSERT_TEMPLATE = (
     '({columns}) values ({placeholders})'
     '{using}'
 )
+
+
+def batch_statements(session, key, batch_size, buffer_size, statements):
+    from bndl_cassandra import BatchKey
+    if key == BatchKey.none or key is None:
+        yield from statements
+        return
+    elif key == BatchKey.replica_set:
+        get_replicas = session.cluster.metadata.get_replicas
+        key = lambda stmt: ''.join(replica.address for replica in get_replicas(stmt.keyspace, stmt.routing_key))
+    else:
+        key = lambda stmt: stmt.routing_key
+
+    statements = iter(statements)
+
+    by_size = []
+    def create_batch():
+        batch = []
+        by_size.insert(0, batch)
+        return batch
+    by_key = defaultdict(create_batch)
+
+    def create_batch_statement(statements):
+        first = statements[0]
+        batch = BatchStatement(BatchType.UNLOGGED, first.retry_policy,
+                            first.consistency_level,
+                            first.serial_consistency_level)
+        for stmt in statements:
+            batch.add(stmt)
+        return batch
+
+    while True:
+        if by_size and (len(by_size) >= buffer_size or len(by_size[-1]) >= batch_size):
+            batch_stmt = create_batch_statement(by_size[-1])
+            yield batch_stmt
+            del by_key[key(batch_stmt)]
+            del by_size[-1]
+        else:
+            try:
+                stmt = next(statements)
+                batch = by_key[key(stmt)]
+                batch.append(stmt)
+                by_size.sort(key=len)  # use heapq?
+            except StopIteration:
+                if by_size:
+                    for batch in by_size:
+                        yield create_batch_statement(batch)
+                break
 
 
 def execute_save(ctx, statement, iterable, contact_points=None):
@@ -45,12 +94,22 @@ def execute_save(ctx, statement, iterable, contact_points=None):
     retry_backoff = ctx.conf.get('bndl_cassandra.write_retry_backoff')
     concurrency = max(1, ctx.conf.get('bndl_cassandra.write_concurrency'))
 
+    batch_key = ctx.conf.get('bndl_cassandra.write_batch_key')
+    batch_size = ctx.conf.get('bndl_cassandra.write_batch_size')
+    batch_buffer_size = ctx.conf.get('bndl_cassandra.write_batch_buffer_size')
+
     if logger.isEnabledFor(logging.INFO):
         logger.info('executing cassandra save with statement %s', statement.replace('\n', ''))
 
     with cassandra_session(ctx, contact_points=contact_points) as session:
         prepared_statement = session.prepare(statement)
         prepared_statement.consistency_level = consistency_level
+
+        # bind each element in iterable to the prepared statement
+        statements = map(prepared_statement.bind, iterable)
+        # batching statements as configured
+        statements = batch_statements(session, batch_key, batch_size,
+                                      batch_buffer_size, statements)
 
         saved = 0
         pending = 0
@@ -59,22 +118,25 @@ def execute_save(ctx, statement, iterable, contact_points=None):
         failure = None
         failcounts = defaultdict(int)
 
-        def on_done(results, idx):
+        def on_done(results, idx, statement):
             nonlocal saved, pending, cond
             with cond:
-                saved += 1
+                if isinstance(statement, BatchStatement):
+                    saved += len(statement._statements_and_parameters)
+                else:
+                    saved += 1
                 pending -= 1
                 cond.notify_all()
 
-        def on_failed(exc, idx, element):
+        def on_failed(exc, idx, statement):
             nonlocal failcounts, session
             if type(exc) in TRANSIENT_ERRORS and failcounts[idx] < retry_count:
                 failcounts[idx] += 1
                 if retry_backoff:
                     sleep = retry_delay(retry_backoff, failcounts[idx])
-                    session.cluster.scheduler.schedule(sleep, partial(exec_async, idx, element))
+                    session.cluster.scheduler.schedule(sleep, partial(exec_async, idx, statement))
                 else:
-                    exec_async(idx, element)
+                    exec_async(idx, statement)
             else:
                 nonlocal failure, pending, cond
                 with cond:
@@ -82,19 +144,19 @@ def execute_save(ctx, statement, iterable, contact_points=None):
                     pending -= 1
                     cond.notify_all()
 
-        def exec_async(idx, element):
+        def exec_async(idx, statement):
             nonlocal session
-            future = session.execute_async(prepared_statement, element, timeout=timeout)
-            future.add_callback(on_done, idx)
-            future.add_errback(on_failed, idx, element)
+            future = session.execute_async(statement, timeout=timeout)
+            future.add_callback(on_done, idx, statement)
+            future.add_errback(on_failed, idx, statement)
 
-        for idx, element in enumerate(iterable):
+        for idx, statement in enumerate(statements):
             with cond:
                 cond.wait_for(lambda: pending < concurrency)
                 if failure:
                     raise failure
                 pending += 1
-            exec_async(idx, element)
+            exec_async(idx, statement)
 
         if failure:
             raise failure

@@ -17,7 +17,7 @@ class CassandraTest(DatasetTest):
                         'replication_factor': '1'
                     }};
                 '''.format(keyspace=cls.keyspace))
-    
+
                 session.execute('''
                     create table if not exists {keyspace}.{table} (
                         key text,
@@ -37,6 +37,10 @@ class CassandraTest(DatasetTest):
 
     def setUp(self):
         super().setUp()
-        truncate = 'truncate {keyspace}.{table};'.format(keyspace=self.keyspace, table=self.table)
+        self.truncate()
+
+    def truncate(self, keyspace=None, table=None):
+        truncate = 'truncate %s.%s;' % (keyspace or self.keyspace,
+                                        table or self.table)
         with self.ctx.cassandra_session() as session:
             session.execute(truncate)

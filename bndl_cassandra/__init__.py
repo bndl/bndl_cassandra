@@ -1,3 +1,5 @@
+from enum import Enum
+
 from bndl.compute.context import ComputeContext
 from bndl.compute.dataset import Dataset
 from bndl.util.conf import Int, Float, CSV, String, Bool, Attr
@@ -6,6 +8,13 @@ from bndl_cassandra.dataset import CassandraScanDataset
 from bndl_cassandra.save import cassandra_save
 from bndl_cassandra.session import cassandra_session
 from cassandra import ConsistencyLevel
+
+
+class BatchKey(Enum):
+    none = 0
+    replica_set = 1
+    partition_key = 2
+
 
 
 # Configuration
@@ -28,6 +37,9 @@ write_retry_backoff = Float(2, desc='delay = {write_timeout_backoff} ^ retry_rou
 write_timeout = Int(120)
 write_concurrency = Int(2)
 write_consistency_level = Attr(ConsistencyLevel.LOCAL_QUORUM, obj=ConsistencyLevel)
+write_batch_key = Attr(BatchKey.none, obj=BatchKey)
+write_batch_size = Int(100)
+write_batch_buffer_size = Int(1000)
 
 
 # Bndl API extensions
