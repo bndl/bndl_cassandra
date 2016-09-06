@@ -1,5 +1,6 @@
 from operator import itemgetter
 import copy
+import functools
 import math
 import random
 
@@ -88,6 +89,7 @@ def partition_ranges_(ranges, max_length, size_estimate):
             yield bin.ranges, bin.size
 
 
+@functools.lru_cache()
 def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
     # estimate size of table
     size_estimate = size_estimates or estimate_size(session, keyspace, table)

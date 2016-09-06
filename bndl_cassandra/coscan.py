@@ -91,11 +91,11 @@ class CassandraCoScanDataset(Dataset):
 
             partitions = partitioner.partition_ranges(self.ctx, session, self.keyspace, size_estimates=size_estimates)
 
-            return [
-                CassandraCoScanPartition(self, idx, [CassandraScanPartition(scan, idx, *part)
-                                                         for scan in self.src])
-                for idx, part in enumerate(partitions)
-            ]
+        return [
+            CassandraCoScanPartition(self, idx, [CassandraScanPartition(scan, idx, *part)
+                                                     for scan in self.src])
+            for idx, part in enumerate(partitions)
+        ]
 
 
 

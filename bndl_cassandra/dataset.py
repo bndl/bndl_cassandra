@@ -249,7 +249,6 @@ class CassandraScanDataset(Dataset):
         return CassandraCoScanDataset(self, other, keys=keys)
 
 
-    @functools.lru_cache(1)
     def parts(self):
         with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
             partitions = partitioner.partition_ranges(self.ctx, session, self.keyspace, self.table)
