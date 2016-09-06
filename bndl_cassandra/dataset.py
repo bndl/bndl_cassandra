@@ -126,8 +126,6 @@ class CassandraScanDataset(Dataset):
         else:
             pk_cols_selected = [c.name for c in self.meta.primary_key]
 
-        # creates dicts with column names and numpy arrays per query page
-        arrays = self._with(_row_factory=tuple_factory, _protocol_handler='NumpyProtocolHandler')
 
         # converts each dict of numpy arrays (a query page) to a pandas dataframe
         def to_df(arrays):
@@ -145,11 +143,20 @@ class CassandraScanDataset(Dataset):
         def as_df(part):
             return combine_dataframes(to_df(arrays) for arrays in part)
 
-        # take first to get meta data
-        sample = next(arrays.limit(1).map_partitions(as_df).icollect(eager=False, parts=True))
+        # determine index names
+        index = pk_cols_selected or [None]
+        # determine column names
+        if self._select:
+            columns = self._select
+        else:
+            columns = self.meta.columns
+        columns = [c for c in columns if c not in pk_cols_selected]
 
-        # create the DDF
-        return DistributedDataFrame.from_sample(arrays.map_partitions(as_df), sample)
+        # creates dicts with column names and numpy arrays per query page
+        arrays = self._with(_row_factory=tuple_factory, _protocol_handler='NumpyProtocolHandler')
+        # convert to dataframes
+        dfs = arrays.map_partitions(as_df)
+        return DistributedDataFrame(dfs, index, columns)
 
 
     def span_by(self, *cols):
