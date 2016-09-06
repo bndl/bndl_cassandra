@@ -1,6 +1,7 @@
 from operator import itemgetter
 import copy
 import math
+import random
 
 from cytoolz import itertoolz
 
@@ -121,6 +122,9 @@ def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
                 size * size_estimate.token_size_mb,
                 size * size_estimate.token_size_keys
             ))
+
+    # randomize the partitions so that load is spread over the replica sets
+    random.shuffle(partitions)
 
     return partitions
 

@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='bndl_cassandra',
-    version='0.2.6',
+    version='0.2.7',
     url='https://stash.tgho.nl/projects/THCLUSTER/repos/bndl_cassandra/browse',
     description='Read from and write to Apache Cassandra with BNDL',
     long_description=open('README.md').read(),
