@@ -63,17 +63,20 @@ def _get_contact_points(ctx, *contact_points):
 
 
 @contextlib.contextmanager
-def cassandra_session(ctx, keyspace=None, contact_points=None):
+def cassandra_session(ctx, keyspace=None, contact_points=None,
+                      row_factory=None, client_protocol_handler=None):
     # get hold of the dict of pools (keyed by contact_points)
     pools = getattr(cassandra_session, 'pools', None)
     if not pools:
         cassandra_session.pools = pools = {}
+
     # determine contact points, either given or IP addresses of the workers
     contact_points = get_contact_points(ctx, contact_points)
     # check if there is a cached session object
     pool = pools.get(contact_points)
     if not keyspace:
         keyspace = ctx.conf.get('bndl_cassandra.keyspace')
+
     # or create one if not
     if not pool:
         def create_cluster():
@@ -106,9 +109,22 @@ def cassandra_session(ctx, keyspace=None, contact_points=None):
     # take a session from the pool, yield it to the caller
     # and put the session back in the pool
     session = pool.get()
+
+    old_row_factory = session.row_factory
+    old_protocol_handler = session.client_protocol_handler
+
     try:
+        if row_factory:
+            session.row_factory = row_factory
+        if client_protocol_handler:
+            session.client_protocol_handler = client_protocol_handler
+
         yield session
+
     finally:
+        session.row_factory = old_row_factory
+        session.client_protocol_handler = old_protocol_handler
+
         try:
             pool.put(session)
         except queue.Full:

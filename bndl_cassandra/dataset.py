@@ -38,7 +38,62 @@ def get_table_meta(session, keyspace, table):
         raise KeyError(msg) from e
 
 
-class CassandraScanDataset(Dataset):
+
+class _CassandraDataset(Dataset):
+    def __init__(self, ctx, keyspace, table, contact_points=None):
+        super().__init__(ctx)
+        self.keyspace = keyspace
+        self.table = table
+        self.contact_points = contact_points
+        self._row_factory = named_tuple_factory
+        self._protocol_handler = None
+        self._select = None
+        self._limit = None
+
+    def _session(self):
+        client_protocol_handler = (getattr(protocol, self._protocol_handler)
+                                   if self._protocol_handler else None)
+        return self.ctx.cassandra_session(contact_points=self.contact_points,
+                                          row_factory=self._row_factory,
+                                          client_protocol_handler=client_protocol_handler)
+
+    @property
+    @functools.lru_cache(1)
+    def meta(self):
+        with self._session() as session:
+            return get_table_meta(session, self.keyspace, self.table)
+
+    def as_tuples(self):
+        return self._with(_row_factory=tuple_factory)
+
+    def as_dicts(self):
+        return self._with(_row_factory=dict_factory)
+
+    def select(self, *columns):
+        return self._with(_select=columns)
+
+    def limit(self, num):
+        return self._with(_limit=int(num))
+
+    @property
+    def query(self):
+        select = ', '.join(self._select) if self._select else '*'
+        limit = ' limit %s' % self._limit if self._limit else ''
+        query = ('select {select} '
+                 'from {keyspace}.{table} '
+                 'where {where}{limit}')
+        query = query.format(
+            select=select,
+            keyspace=self.keyspace,
+            table=self.table,
+            where=self._where,
+            limit=limit
+        )
+        return query
+
+
+
+class CassandraScanDataset(_CassandraDataset):
     def __init__(self, ctx, keyspace, table, contact_points=None):
         '''
         Create a scan across keyspace.table.
@@ -53,15 +108,7 @@ class CassandraScanDataset(Dataset):
             None to use the default contact points or a list of contact points
             or a comma separated string of contact points.
         '''
-        super().__init__(ctx)
-        self.keyspace = keyspace
-        self.table = table
-        self.contact_points = contact_points
-        self._row_factory = named_tuple_factory
-        self._protocol_handler = None
-
-        self._select = None
-        self._limit = None
+        super().__init__(ctx, keyspace, table, contact_points)
         self._where = '''
             token({partition_key_column_names}) > ? and
             token({partition_key_column_names}) <= ?
@@ -70,25 +117,12 @@ class CassandraScanDataset(Dataset):
         )
 
 
-    @property
-    @functools.lru_cache(1)
-    def meta(self):
-        with self.ctx.cassandra_session(contact_points=self.contact_points) as session:
-            return get_table_meta(session, self.keyspace, self.table)
-
-
     def count(self, push_down=None):
         if push_down is True or (not self.cached and push_down is None):
             return self.select('count(*)').as_tuples().map(funcs.getter(0)).sum()
         else:
             return super().count()
 
-
-    def as_tuples(self):
-        return self._with(_row_factory=tuple_factory)
-
-    def as_dicts(self):
-        return self._with(_row_factory=dict_factory)
 
     def as_dataframe(self):
         '''
@@ -118,8 +152,7 @@ class CassandraScanDataset(Dataset):
                         2015-01-31 06:29:07.937         7
         '''
         import pandas as pd
-        from bndl.compute.dataframes import DataFrame, DistributedDataFrame, \
-                                            combine_dataframes
+        from bndl.compute.dataframes import DataFrame, DistributedDataFrame
 
         if self._select:
             pk_cols_selected = [c.name for c in self.meta.primary_key if c.name in self._select]
@@ -141,7 +174,12 @@ class CassandraScanDataset(Dataset):
 
         # creates one df per partition
         def as_df(part):
-            return combine_dataframes(to_df(arrays) for arrays in part)
+            return pd.concat(to_df(arrays) for arrays in part)
+#             dfs = (to_df(arrays) for arrays in part)
+#             df = next(dfs)
+#             for x in dfs:
+#                 df = df.append(x)
+#             return df
 
         # determine index names
         index = pk_cols_selected or [None]
@@ -230,13 +268,6 @@ class CassandraScanDataset(Dataset):
         return self.as_dataframe().map_partitions(lambda part: part.groupby(level=levels))
 
 
-    def select(self, *columns):
-        return self._with(_select=columns)
-
-
-    def limit(self, num):
-        return self._with(_limit=int(num))
-
     def itake(self, num):
         if not self.cached and not self._limit:
             return self.limit(num).itake(num)
@@ -259,23 +290,6 @@ class CassandraScanDataset(Dataset):
         ]
 
 
-    def query(self, session):
-        select = ', '.join(self._select) if self._select else '*'
-        limit = ' limit %s' % self._limit if self._limit else ''
-        query = '''
-            select {select}
-            from {keyspace}.{table}
-            where {where}{limit}
-        '''.format(
-            select=select,
-            keyspace=self.keyspace,
-            table=self.table,
-            where=self._where,
-            limit=limit
-        )
-        return session.prepare(query)
-
-
 
 class CassandraScanPartition(Partition):
     def __init__(self, dset, part_idx, replicas, token_ranges, size_estimate_mb, size_estimate_keys):
@@ -287,7 +301,7 @@ class CassandraScanPartition(Partition):
 
 
     def _fetch_token_range(self, session, token_range):
-        query = self.dset.query(session)
+        query = session.prepare(self.dset.query)
         query.consistency_level = self.dset.ctx.conf.get('bndl_cassandra.read_consistency_level')
 
         if logger.isEnabledFor(logging.INFO):
@@ -314,20 +328,11 @@ class CassandraScanPartition(Partition):
         retry_count = max(0, ctx.conf.get('bndl_cassandra.read_retry_count'))
         retry_backoff = ctx.conf.get('bndl_cassandra.read_retry_backoff')
 
-        with ctx.cassandra_session(contact_points=self.dset.contact_points) as session:
-            old_row_factory = session.row_factory
-            old_protocol_handler = session.client_protocol_handler
-            try:
-                session.row_factory = self.dset._row_factory
-                if self.dset._protocol_handler:
-                    session.client_protocol_handler = getattr(protocol, self.dset._protocol_handler)
-                logger.debug('scanning %s token ranges with query %s', len(self.token_ranges))
-                for token_range in self.token_ranges:
-                    yield from do_with_retry(partial(self._fetch_token_range, session, token_range),
-                                             retry_count, retry_backoff, TRANSIENT_ERRORS)
-            finally:
-                session.row_factory = old_row_factory
-                session.client_protocol_handler = old_protocol_handler
+        with self.dset._session() as session:
+            logger.debug('scanning %s token ranges with query %s', len(self.token_ranges))
+            for token_range in self.token_ranges:
+                yield from do_with_retry(partial(self._fetch_token_range, session, token_range),
+                                         retry_count, retry_backoff, TRANSIENT_ERRORS)
 
 
     def _preferred_workers(self, workers):

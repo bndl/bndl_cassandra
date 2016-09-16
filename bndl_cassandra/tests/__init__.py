@@ -8,6 +8,9 @@ class CassandraTest(DatasetTest):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+
+        cls.ctx.conf['bndl_cassandra.contact_points'] = '127.0.0.1'
+
         try:
             with cls.ctx.cassandra_session() as session:
                 session.execute('''
