@@ -54,7 +54,6 @@ class ReadTest(CassandraTest):
         first = df.first()
         self.assertIsInstance(first, tuple)
         self.assertEqual(len(first), 2)
-        self.assertEqual(first[0], '0')
         self.assertIsInstance(first[1], pd.DataFrame)
         self.assertEqual(len(first[1]), row_count // key_count)
         take3 = df.take(3)
