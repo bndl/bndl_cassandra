@@ -62,8 +62,8 @@ setup(
             'bndl_cassandra=bndl_cassandra',
         ]
     },
-      
-    classifiers = [
+
+    classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',

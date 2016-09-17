@@ -1,2 +1,2 @@
 include README.md
-recursive-include bndl_cassandra *.html
+recursive-include bndl_cassandra *.html *.pyx
