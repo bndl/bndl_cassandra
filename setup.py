@@ -1,11 +1,34 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+import os
+import re
+
+from setuptools import setup, find_packages, Extension
+
+
+ext = re.compile(r'\.pyx$')
+
+extensions = [
+    Extension(
+        '.'.join((root.replace(os.sep, '.'), ext.sub('', f))),
+        [os.path.join(root, f)]
+    )
+    for root, dirs, files in os.walk('bndl_cassandra')
+    for f in files
+    if not root.endswith('tests')
+    if ext.search(f)
+]
+
+try:
+    from Cython.Build.Dependencies import cythonize
+    extensions = cythonize(extensions)
+except ImportError:
+    pass
 
 
 setup(
     name='bndl_cassandra',
-    version='0.2.0',
+    version='0.3.1',
     url='https://stash.tgho.nl/projects/THCLUSTER/repos/bndl_cassandra/browse',
     description='Read from and write to Apache Cassandra with BNDL',
     long_description=open('README.md').read(),
@@ -31,6 +54,8 @@ setup(
             'bndl[dev]',
         ],
     ),
+
+    ext_modules=extensions,
 
     entry_points={
         'bndl.plugin':[

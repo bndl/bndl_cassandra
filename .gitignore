@@ -1,6 +1,9 @@
 .settings
 scratch
 
+*.c
+*.so
+
 .eggs
 *.egg-info
 dist

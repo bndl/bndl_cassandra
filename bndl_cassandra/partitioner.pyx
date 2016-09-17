@@ -46,11 +46,14 @@ class Bin(object):
         self.size = 0
 
 
+@functools.lru_cache()
 def partition_ranges_(ranges, max_length, size_estimate):
     # split ranges such that they are small enough
     # ranges which need to be split are yielded immediately, they'd fill a bin anyway
     # the ranges smaller than max_length are put into a list for binning
     # and sorted larger > smaller (First Fit Decreasing strategy)
+    partitioned = []
+
     sorted_ranges = []
     for start, end in ranges:
         length = end - start
@@ -58,9 +61,9 @@ def partition_ranges_(ranges, max_length, size_estimate):
             parts = int((length - 1) / max_length)
             step = math.ceil(length / (parts + 1))
             for _ in range(parts):
-                yield [(start, start + step)], step
+                partitioned.append((((start, start + step),), step))
                 start = start + step
-            yield [(start, end)], end - start
+            partitioned.append((((start, end),), end - start))
         else:
             sorted_ranges.append((start, end, length))
     # Sort biggest first
@@ -86,10 +89,11 @@ def partition_ranges_(ranges, max_length, size_estimate):
 
     for bin in bins:
         if bin.size:
-            yield bin.ranges, bin.size
+            partitioned.append((bin.ranges, bin.size))
+
+    return partitioned
 
 
-@functools.lru_cache()
 def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
     # estimate size of table
     size_estimate = size_estimates or estimate_size(session, keyspace, table)
@@ -118,7 +122,8 @@ def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
 
     for replicas, ranges in sorted(by_replicas.items(), key=itemgetter(0)):
         ranges = itertoolz.pluck([1, 2], ranges)
-        for ranges, size in partition_ranges_(ranges, max_length, size_estimate):
+        partitioned = partition_ranges_(tuple(ranges), max_length, size_estimate)
+        for ranges, size in partitioned:
             partitions.append((
                 replicas, ranges,
                 size * size_estimate.token_size_mb,
@@ -156,6 +161,18 @@ class SizeEstimate(object):
         self.token_size_keys = (self.token_size_keys + other.token_size_keys) / 2
         self.token_size_mb = (self.token_size_mb + other.token_size_mb) / 2
         return self
+
+    def __hash__(self):
+        return (hash(self.table_size_mb) ^
+                hash(self.table_size_pk) ^
+                hash(self.token_size_mb) ^
+                hash(self.token_size_keys))
+
+    def __eq__(self, other):
+        return (self.table_size_mb == other.table_size_mb and
+                self.table_size_pk == other.table_size_pk and
+                self.token_size_mb == other.token_size_mb and
+                self.token_size_keys == other.token_size_keys)
 
     def __repr__(self):
         return '<SizeEstimate: size=%s, partitions=%s, partitions / token=%s, token size=%s>' % (

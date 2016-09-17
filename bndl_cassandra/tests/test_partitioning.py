@@ -27,7 +27,7 @@ class PartitioningTest(TestCase):
             total_length = 0
             size_estimate = SizeEstimate(size, key_count, fraction)
             max_length = max_keys / size_estimate.token_size_keys
-            partitioned = partition_ranges_(ranges, max_length, size_estimate)
+            partitioned = partition_ranges_(tuple(ranges), max_length, size_estimate)
             for ranges, size in partitioned:
                 for start, end in ranges:
                     length = end - start

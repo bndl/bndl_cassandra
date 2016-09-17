@@ -1,6 +1,9 @@
 from bndl.util.funcs import getter, key_or_getter
 from bndl_cassandra.dataset import _CassandraDataset
 from bndl.compute.dataset import  Partition
+from functools import partial
+from bndl.util.retry import do_with_retry
+from bndl_cassandra.session import TRANSIENT_ERRORS
 
 
 QUERY_TEMPLATE = '''select {select} from {keyspace}.{table} where {where}'''
@@ -90,11 +93,17 @@ class CassandraJoinPartition(Partition):
         on_primary = self.dset._on_primary
         data = self.src.materialize(ctx)
 
+        timeout = self.dset.ctx.conf.get('bndl_cassandra.read_timeout')
+        retry_count = max(0, ctx.conf.get('bndl_cassandra.read_retry_count'))
+        retry_backoff = ctx.conf.get('bndl_cassandra.read_retry_backoff')
+
         with self.dset._session() as session:
             query = session.prepare(self.dset.query)
             for element in data:
                 params = key(element)
-                rows = list(session.execute(query, params))
+                rows = do_with_retry(partial(session.execute, query, params, timeout=timeout),
+                                     retry_count, retry_backoff, TRANSIENT_ERRORS)
+                rows = list(rows)
                 if join_type == INNER and not rows:
                     continue
                 if on_primary:

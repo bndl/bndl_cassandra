@@ -92,6 +92,24 @@ class _CassandraDataset(Dataset):
         return query
 
 
+# converts each dict of numpy arrays (a query page) to a pandas dataframe
+def _arrays_to_df(pk_cols_selected, arrays):
+    import pandas as pd
+    from bndl.compute.dataframes import DataFrame
+
+    if len(pk_cols_selected) == 0:
+        index = None
+    elif len(pk_cols_selected) == 1:
+        name = pk_cols_selected[0]
+        index = pd.Index(arrays.pop(name), name=name)
+    else:
+        index = [arrays.pop(name) for name in pk_cols_selected]
+        index = pd.MultiIndex.from_arrays(index, names=pk_cols_selected)
+
+    return DataFrame(arrays, index)
+
+
+
 
 class CassandraScanDataset(_CassandraDataset):
     def __init__(self, ctx, keyspace, table, contact_points=None):
@@ -152,34 +170,13 @@ class CassandraScanDataset(_CassandraDataset):
                         2015-01-31 06:29:07.937         7
         '''
         import pandas as pd
-        from bndl.compute.dataframes import DataFrame, DistributedDataFrame
+        from bndl.compute.dataframes import DistributedDataFrame
 
         if self._select:
             pk_cols_selected = [c.name for c in self.meta.primary_key if c.name in self._select]
         else:
             pk_cols_selected = [c.name for c in self.meta.primary_key]
-
-
-        # converts each dict of numpy arrays (a query page) to a pandas dataframe
-        def to_df(arrays):
-            if len(pk_cols_selected) == 0:
-                index = None
-            elif len(pk_cols_selected) == 1:
-                name = pk_cols_selected[0]
-                index = pd.Index(arrays.pop(name), name=name)
-            else:
-                index = [arrays.pop(name) for name in pk_cols_selected]
-                index = pd.MultiIndex.from_arrays(index, names=pk_cols_selected)
-            return DataFrame(arrays, index)
-
-        # creates one df per partition
-        def as_df(part):
-            return pd.concat(to_df(arrays) for arrays in part)
-#             dfs = (to_df(arrays) for arrays in part)
-#             df = next(dfs)
-#             for x in dfs:
-#                 df = df.append(x)
-#             return df
+        to_df = partial(_arrays_to_df, pk_cols_selected)
 
         # determine index names
         index = pk_cols_selected or [None]
@@ -193,7 +190,7 @@ class CassandraScanDataset(_CassandraDataset):
         # creates dicts with column names and numpy arrays per query page
         arrays = self._with(_row_factory=tuple_factory, _protocol_handler='NumpyProtocolHandler')
         # convert to dataframes
-        dfs = arrays.map_partitions(as_df)
+        dfs = arrays.map(to_df).map_partitions(pd.concat)
         return DistributedDataFrame(dfs, index, columns)
 
 
@@ -243,6 +240,7 @@ class CassandraScanDataset(_CassandraDataset):
             A_egyclRPOw : comments    5
             dtype: int64
         '''
+        from bndl.compute.dataframes import DataFrame
 
         pk_cols = [c.name for c in self.meta.primary_key]
 
@@ -265,7 +263,7 @@ class CassandraScanDataset(_CassandraDataset):
                              'of and have the same order as primary key')
 
         levels = list(range(len(cols)))
-        return self.as_dataframe().map_partitions(lambda part: part.groupby(level=levels))
+        return self.as_dataframe().map_partitions(partial(DataFrame.groupby, level=levels))
 
 
     def itake(self, num):

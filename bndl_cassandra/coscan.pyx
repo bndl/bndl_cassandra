@@ -1,10 +1,12 @@
+from functools import partial
 import logging
 
 from bndl.compute.dataset import Dataset, Partition
-from bndl.util.funcs import identity
+from bndl.util.funcs import identity, getter
 from bndl_cassandra import partitioner
 from bndl_cassandra.partitioner import estimate_size, SizeEstimate
 from bndl_cassandra.session import cassandra_session
+from cytoolz.itertoolz import take
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ class CassandraCoScanDataset(Dataset):
 
         self.keys = keys
 
+
         with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
             ks_meta = session.cluster.metadata.keyspaces[self.keyspace]
             tbl_metas = [ks_meta.tables[scan.table] for scan in scans]
@@ -41,13 +44,8 @@ class CassandraCoScanDataset(Dataset):
                     assert len(tbl_meta.primary_key) == primary_key_length, \
                         "can't co-scan without keys with varying primary key length"
 
-                def keyfunc(row):
-                    return tuple(row[i] for i in range(primary_key_length))
-                self.keyfuncs = [keyfunc] * len(scans)
-
-                def grouptransform(group):
-                    return group[0] if group else None
-                self.grouptransforms = [grouptransform] * len(scans)
+                self.keyfuncs = [partial(take, primary_key_length)] * len(scans)
+                self.grouptransforms = [getter(0)] * len(scans)
 
             else:
                 assert len(keys) == len(scans), \
@@ -68,9 +66,9 @@ class CassandraCoScanDataset(Dataset):
                         "select all columns or the primary key columns in the order as they " \
                         "are defined in the CQL schema"
 
-                    self.keyfuncs.append(lambda row, keylen=keylen: row[:keylen])
+                    self.keyfuncs.append(partial(take, keylen))
                     if keylen == len(tbl_meta.primary_key):
-                        self.grouptransforms.append(lambda group: group[0] if group else None)
+                        self.grouptransforms.append(getter(0))
                     else:
                         self.grouptransforms.append(identity)
 
@@ -98,7 +96,6 @@ class CassandraCoScanDataset(Dataset):
         ]
 
 
-
 class CassandraCoScanPartition(Partition):
     def __init__(self, dset, idx, scans):
         super().__init__(dset, idx)
@@ -115,12 +112,12 @@ class CassandraCoScanPartition(Partition):
         merged = {}
 
         for cidx, scan in enumerate(subscans):
-            key = keyfuncs[cidx]
+            keyf = keyfuncs[cidx]
             for row in scan:
-                k = key(row)
-                batch = merged.get(k)
+                key = tuple(keyf(row))
+                batch = merged.get(key)
                 if not batch:
-                    merged[k] = batch = [[] for _ in subscans]
+                    merged[key] = batch = [[] for _ in subscans]
                 batch[cidx].append(row)
 
         for key, groups in merged.items():

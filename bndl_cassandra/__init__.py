@@ -44,7 +44,7 @@ write_batch_buffer_size = Int(1000)
 
 
 # Bndl API extensions
-ComputeContext.cassandra_session = cassandra_session
+ComputeContext.cassandra_session = as_method(cassandra_session)
 ComputeContext.cassandra_table = as_method(CassandraScanDataset)
-Dataset.cassandra_save = cassandra_save
+Dataset.cassandra_save = as_method(cassandra_save)
 Dataset.join_with_cassandra = as_method(CassandraJoinDataset)
