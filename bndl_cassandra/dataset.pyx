@@ -11,6 +11,7 @@ from bndl_cassandra.coscan import CassandraCoScanDataset
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
 from cassandra import protocol
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
+from cassandra.protocol import ErrorMessage
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,8 @@ class _CassandraDataset(Dataset):
         limit = ' limit %s' % self._limit if self._limit else ''
         query = ('select {select} '
                  'from {keyspace}.{table} '
-                 'where {where}{limit}')
+                 'where {where}{limit} '
+                 'allow filtering')
         query = query.format(
             select=select,
             keyspace=self.keyspace,
@@ -127,12 +129,21 @@ class CassandraScanDataset(_CassandraDataset):
             or a comma separated string of contact points.
         '''
         super().__init__(ctx, keyspace, table, contact_points)
-        self._where = '''
-            token({partition_key_column_names}) > ? and
-            token({partition_key_column_names}) <= ?
-        '''.format(
-            partition_key_column_names=', '.join(c.name for c in self.meta.partition_key)
-        )
+        self._where_tokens = ('token({partition_key_column_names}) > ? and '
+                              'token({partition_key_column_names}) <= ?').format(
+                                partition_key_column_names=', '.join(c.name for c in self.meta.partition_key)
+                            )
+        self._where_clause = ''
+        self._where_values = ()
+
+
+    @property
+    def _where(self):
+        return ' and '.join(filter(None, ((self._where_tokens, self._where_clause))))
+
+
+    def where(self, clause, *values):
+        return self._with(_where_clause=clause, _where_values=values)
 
 
     def count(self, push_down=None):
@@ -299,14 +310,19 @@ class CassandraScanPartition(Partition):
 
 
     def _fetch_token_range(self, session, token_range):
-        query = session.prepare(self.dset.query)
+        try:
+            query = session.prepare(self.dset.query)
+        except ErrorMessage as exc:
+            raise Exception('Unable to prepare query %s, error: %s' % (self.dset.query, str(exc)))
+
         query.consistency_level = self.dset.ctx.conf.get('bndl_cassandra.read_consistency_level')
 
         if logger.isEnabledFor(logging.INFO):
             logger.info('executing query %s for token_range %s', query.query_string.replace('\n', ''), token_range)
 
         timeout = self.dset.ctx.conf.get('bndl_cassandra.read_timeout')
-        resultset = session.execute(query, token_range, timeout=timeout)
+        params = token_range + self.dset._where_values
+        resultset = session.execute(query, params, timeout=timeout)
 
         results = []
         while True:

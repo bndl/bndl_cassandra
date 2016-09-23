@@ -63,8 +63,18 @@ class ReadTest(CassandraTest):
         self.assertIsInstance(collected, list)
         self.assertEqual(len(collected), key_count)
 
-    # TODO def test_select(self):
-    # TODO def test_where(self):
+    def test_select(self):
+        columns = sorted(('key', 'cluster', 'varint_val'))
+        rows = self.ctx.cassandra_table(self.keyspace, self.table).as_dicts().select(*columns).collect()
+        self.assertEqual(len(rows), row_count)
+        for row in rows:
+            self.assertEqual(sorted(row.keys()), columns)
+
+    def test_where(self):
+        min_cluster = '50'
+        rows = self.ctx.cassandra_table(self.keyspace, self.table).where('cluster > ?', min_cluster)
+        for cluster in rows.select('cluster').pluck(0).icollect():
+            self.assertGreater(cluster, min_cluster)
 
     def test_slicing(self):
         first = self.ctx.cassandra_table(self.keyspace, self.table).first()
