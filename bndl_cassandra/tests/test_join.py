@@ -2,7 +2,7 @@ from bndl_cassandra.tests import CassandraTest
 
 key_count = 10
 row_count = 100
-rows = [dict(key=str(i % key_count), cluster=str(i), varint_val=i) for i in range(row_count)]
+rows = [dict(key=str(i % key_count), cluster=i, varint_val=i) for i in range(row_count)]
 tuple_rows = [((row['key'], row['cluster']), row['varint_val']) for row in rows]
 
 class JoinTest(CassandraTest):

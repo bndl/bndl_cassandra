@@ -10,7 +10,7 @@ class SaveTest(CassandraTest):
 
 
     def test_save_dicts(self):
-        dset = self.ctx.range(self.num_rows).map(lambda i: dict(key=str(i), cluster=str(i), varint_val=i))
+        dset = self.ctx.range(self.num_rows).map(lambda i: dict(key=str(i), cluster=i, varint_val=i))
         saved = (dset.cassandra_save(self.keyspace, self.table).sum())
 
         self.assertEqual(saved, self.num_rows)
@@ -23,7 +23,7 @@ class SaveTest(CassandraTest):
 
 
     def test_save_tuples(self):
-        dset = self.ctx.range(self.num_rows).map(lambda i: (str(i), str(i), i))
+        dset = self.ctx.range(self.num_rows).map(lambda i: (str(i), i, i))
         saved = (dset.cassandra_save(
             self.keyspace, self.table,
             columns=('key', 'cluster', 'varint_val'),
@@ -40,7 +40,7 @@ class SaveTest(CassandraTest):
 
 
     def test_save_batches(self):
-        dset = self.ctx.range(self.num_rows).map(lambda i: (str(i // 100), str(i), i))
+        dset = self.ctx.range(self.num_rows).map(lambda i: (str(i // 100), i, i))
         for batch_key in ('none', 'replica_set', 'partition_key'):
             self.truncate()
             self.ctx.conf['bndl_cassandra.write_batch_key'] = batch_key

@@ -3,7 +3,7 @@ from bndl_cassandra.tests import CassandraTest
 
 key_count = 10
 row_count = 100
-rows = [dict(key=str(i % key_count), cluster=str(i), varint_val=i) for i in range(row_count)]
+rows = [dict(key=str(i % key_count), cluster=i, varint_val=i) for i in range(row_count)]
 
 
 class ReadTest(CassandraTest):
@@ -71,10 +71,13 @@ class ReadTest(CassandraTest):
             self.assertEqual(sorted(row.keys()), columns)
 
     def test_where(self):
-        min_cluster = '50'
-        rows = self.ctx.cassandra_table(self.keyspace, self.table).where('cluster > ?', min_cluster)
-        for cluster in rows.select('cluster').pluck(0).icollect():
-            self.assertGreater(cluster, min_cluster)
+        min_cluster = 50
+        rows = self.ctx.cassandra_table(self.keyspace, self.table).where('cluster >= ?', min_cluster)
+        collected = rows.select('cluster').pluck(0).collect()
+        self.assertEqual(len(collected), 50)
+        for cluster in collected:
+            self.assertGreaterEqual(cluster, min_cluster)
+        self.assertEqual(rows.count(), 50)
 
     def test_slicing(self):
         first = self.ctx.cassandra_table(self.keyspace, self.table).first()

@@ -24,7 +24,7 @@ class CassandraTest(DatasetTest):
                 session.execute('''
                     create table if not exists {keyspace}.{table} (
                         key text,
-                        cluster text,
+                        cluster int,
                         int_list list<int>,
                         double_set set<double>,
                         text_map map<text,text>,
