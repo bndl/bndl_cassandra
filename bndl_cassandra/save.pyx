@@ -134,6 +134,9 @@ def execute_save(ctx, statement, iterable, contact_points=None):
                 failcounts[idx] += 1
                 if retry_backoff:
                     sleep = retry_delay(retry_backoff, failcounts[idx])
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug('query failed with %s, %s in total for this query, backing off with sleep of %ss',
+                                     type(exc).__name__, failcounts[idx], sleep)
                     session.cluster.scheduler.schedule(sleep, partial(exec_async, idx, statement))
                 else:
                     exec_async(idx, statement)
@@ -160,6 +163,8 @@ def execute_save(ctx, statement, iterable, contact_points=None):
 
         if failure:
             raise failure
+
+        logger.debug('all queries issued, waiting for completion')
 
         with cond:
             cond.wait_for(lambda: pending <= 0)
