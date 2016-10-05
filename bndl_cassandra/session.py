@@ -7,23 +7,56 @@ import queue
 from bndl.util.pool import ObjectPool
 from cassandra import OperationTimedOut, ReadTimeout, WriteTimeout, CoordinationFailure, Unavailable
 from cassandra.cluster import Cluster, Session
-from cassandra.policies import DCAwareRoundRobinPolicy, HostDistance
-from cassandra.policies import TokenAwarePolicy
+from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
+from cassandra.policies.HostDistance import LOCAL, REMOTE
 
 
 TRANSIENT_ERRORS = (Unavailable, ReadTimeout, WriteTimeout, OperationTimedOut, CoordinationFailure)
 
 
-class LocalNodeFirstPolicy(DCAwareRoundRobinPolicy):
-    def __init__(self, local_hosts):
-        super().__init__()
+class LocalNodeFirstPolicy(TokenAwarePolicy):
+    def __init__(self, child_policy, local_hosts):
+        super().__init__(child_policy)
         self._local_hosts = local_hosts
 
-    def distance(self, host):
-        if host.address in self._local_hosts:
-            return HostDistance.LOCAL
+
+    def is_node_local(self, host):
+        return host.address in self._local_hosts
+
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        if query and query.keyspace:
+            keyspace = query.keyspace
         else:
-            return HostDistance.REMOTE
+            keyspace = working_keyspace
+
+        child = self._child_policy
+        if query is None:
+            for host in child.make_query_plan(keyspace, query):
+                yield host
+        else:
+            routing_key = query.routing_key
+            if routing_key is None or keyspace is None:
+                for host in child.make_query_plan(keyspace, query):
+                    yield host
+            else:
+                replicas = [replica for replica in
+                            self._cluster_metadata.get_replicas(keyspace, routing_key)
+                            if replica.is_up]
+                
+                for replica in replicas:
+                    if self.is_node_local(replica):
+                        yield replica
+
+                for replica in replicas:
+                    # local replica's on other machines
+                    if child.distance(replica) == LOCAL and not self.is_node_local(replica):
+                        yield replica
+
+                for host in child.make_query_plan(keyspace, query):
+                    # skip if we've already listed this host
+                    if host not in replicas or child.distance(host) == REMOTE:
+                        yield host
 
 
 _PREPARE_LOCK = Lock()
@@ -84,7 +117,7 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
                 contact_points,
                 port=ctx.conf.get('bndl_cassandra.port'),
                 compression=ctx.conf.get('bndl_cassandra.compression'),
-                load_balancing_policy=TokenAwarePolicy(LocalNodeFirstPolicy(ctx.node.ip_addresses)),
+                load_balancing_policy=LocalNodeFirstPolicy(DCAwareRoundRobinPolicy(), ctx.node.ip_addresses),
                 metrics_enabled=ctx.conf.get('bndl_cassandra.metrics_enabled'),
             )
 
