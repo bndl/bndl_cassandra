@@ -343,7 +343,7 @@ class CassandraScanPartition(Partition):
         retry_backoff = ctx.conf.get('bndl_cassandra.read_retry_backoff')
 
         with self.dset._session() as session:
-            logger.debug('scanning %s token ranges with query %s', len(self.token_ranges))
+            logger.debug('scanning %s token ranges', len(self.token_ranges))
             for token_range in self.token_ranges:
                 yield from do_with_retry(partial(self._fetch_token_range, session, token_range),
                                          retry_count, retry_backoff, TRANSIENT_ERRORS)
