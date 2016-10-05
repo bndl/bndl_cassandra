@@ -130,8 +130,9 @@ def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
                 size * size_estimate.token_size_keys
             ))
 
-    # randomize the partitions so that load is spread over the replica sets
-    random.shuffle(partitions)
+    # shuffle the partitions so that load is spread over the replica sets
+    # use a fixed seed so that the 'randomness' is fixed
+    random.Random(42).shuffle(partitions)
 
     return partitions
 
