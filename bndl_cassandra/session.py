@@ -7,8 +7,7 @@ import queue
 from bndl.util.pool import ObjectPool
 from cassandra import OperationTimedOut, ReadTimeout, WriteTimeout, CoordinationFailure, Unavailable
 from cassandra.cluster import Cluster, Session
-from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
-from cassandra.policies.HostDistance import LOCAL, REMOTE
+from cassandra.policies import DCAwareRoundRobinPolicy, HostDistance, TokenAwarePolicy
 
 
 TRANSIENT_ERRORS = (Unavailable, ReadTimeout, WriteTimeout, OperationTimedOut, CoordinationFailure)
@@ -50,12 +49,12 @@ class LocalNodeFirstPolicy(TokenAwarePolicy):
 
                 for replica in replicas:
                     # local replica's on other machines
-                    if child.distance(replica) == LOCAL and not self.is_node_local(replica):
+                    if child.distance(replica) == HostDistance.LOCAL and not self.is_node_local(replica):
                         yield replica
 
                 for host in child.make_query_plan(keyspace, query):
                     # skip if we've already listed this host
-                    if host not in replicas or child.distance(host) == REMOTE:
+                    if host not in replicas or child.distance(host) == HostDistance.REMOTE:
                         yield host
 
 
