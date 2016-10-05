@@ -9,7 +9,6 @@ from bndl.util.retry import retry_delay
 from bndl.util.timestamps import ms_timestamp
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
 from cassandra.query import BatchStatement, BatchType, BoundStatement
-import heapq
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,8 @@ def batch_statements(session, key, batch_size, buffer_size, statements):
             # no params is 2 bytes, statement type is a byte
             # add some 5 bytes margin makes 8
             # each value is prepended by an int
-            stmt_size = 8 + sum(4 + len(v) for v in stmt.values)
+            stmt_size = 8 + 4 * len(stmt.values) + \
+                        sum(len(v) for v in stmt.values if type(v) == bytes)
             if isinstance(stmt, BoundStatement):
                 # query strings are prepended by a long
                 stmt_size += 8 + len(stmt.prepared_statement.query_id)
