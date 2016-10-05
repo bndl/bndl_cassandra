@@ -8,7 +8,8 @@ import logging
 from bndl.util.retry import retry_delay
 from bndl.util.timestamps import ms_timestamp
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
-from cassandra.query import BatchStatement, BatchType
+from cassandra.query import BatchStatement, BatchType, BoundStatement
+import heapq
 
 
 logger = logging.getLogger(__name__)
@@ -34,12 +35,7 @@ def batch_statements(session, key, batch_size, buffer_size, statements):
 
     statements = iter(statements)
 
-    by_size = []
-    def create_batch():
-        batch = []
-        by_size.insert(0, batch)
-        return batch
-    by_key = defaultdict(create_batch)
+    by_key = {}
 
     def create_batch_statement(statements):
         first = statements[0]
@@ -50,23 +46,51 @@ def batch_statements(session, key, batch_size, buffer_size, statements):
             batch.add(stmt)
         return batch
 
+    def create_batch(stmt, k):
+        batch = BatchStatement(BatchType.UNLOGGED,
+                       stmt.retry_policy,
+                       stmt.consistency_level,
+                       stmt.serial_consistency_level)
+        by_key[k] = batch
+        # The Java driver has the option to request the encoded size, the
+        # python driver doesn't, this is an approximation of the size based
+        # on the v4 Cassandra protocol
+        # batch type is a byte, no queries is 2 bytes, consistency level is a
+        # short (2 bytes), flags is a byte, timestamp is 8 bytes
+        # adding 6 bytes margin makes 20
+        batch.size = 20
+        return batch
+
     while True:
-        if by_size and (len(by_size) >= buffer_size or len(by_size[-1]) >= batch_size):
-            batch_stmt = create_batch_statement(by_size[-1])
-            yield batch_stmt
-            del by_key[key(batch_stmt)]
-            del by_size[-1]
+        try:
+            stmt = next(statements)
+        except StopIteration:
+            yield from by_key.values()
+            break
         else:
-            try:
-                stmt = next(statements)
-                batch = by_key[key(stmt)]
-                batch.append(stmt)
-                by_size.sort(key=len)  # use heapq?
-            except StopIteration:
-                if by_size:
-                    for batch in by_size:
-                        yield create_batch_statement(batch)
-                break
+            k = key(stmt)
+            batch = by_key.get(k)
+            # The Java driver has the option to request the encoded size, the
+            # python driver doesn't, this is an approximation of the size based
+            # on the v4 Cassandra protocol
+            # no params is 2 bytes, statement type is a byte
+            # add some 5 bytes margin makes 8
+            # each value is prepended by an int
+            stmt_size = 8 + sum(4 + len(v) for v in stmt.values)
+            if isinstance(stmt, BoundStatement):
+                # query strings are prepended by a long
+                stmt_size += 8 + len(stmt.prepared_statement.query_id)
+            else:
+                # query ids are prepended by a short
+                stmt_size += 2 + len(stmt.query_string)
+
+            if batch is None:
+                batch = create_batch(stmt, k)
+            elif batch.size + stmt_size > batch_size:
+                yield batch
+                batch = create_batch(stmt, k)
+            batch.add(stmt)
+            batch.size += stmt_size
 
 
 def execute_save(ctx, statement, iterable, contact_points=None):
@@ -95,7 +119,7 @@ def execute_save(ctx, statement, iterable, contact_points=None):
     concurrency = max(1, ctx.conf.get('bndl_cassandra.write_concurrency'))
 
     batch_key = ctx.conf.get('bndl_cassandra.write_batch_key')
-    batch_size = ctx.conf.get('bndl_cassandra.write_batch_size')
+    batch_size = ctx.conf.get('bndl_cassandra.write_batch_size') * 1024
     batch_buffer_size = ctx.conf.get('bndl_cassandra.write_batch_buffer_size')
 
     if logger.isEnabledFor(logging.INFO):

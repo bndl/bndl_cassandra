@@ -39,7 +39,7 @@ write_timeout = Int(120)
 write_concurrency = Int(2)
 write_consistency_level = Attr(ConsistencyLevel.LOCAL_QUORUM, obj=ConsistencyLevel)
 write_batch_key = Attr(BatchKey.none, obj=BatchKey)
-write_batch_size = Int(100)
+write_batch_size = Int(50, desc='maximum size of a batch in kilobytes')
 write_batch_buffer_size = Int(1000)
 
 
