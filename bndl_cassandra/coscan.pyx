@@ -1,4 +1,4 @@
-from functools import partial
+from functools import partial, lru_cache
 import logging
 
 from bndl.compute.dataset import Dataset, Partition
@@ -10,6 +10,13 @@ from cytoolz.itertoolz import take
 
 
 logger = logging.getLogger(__name__)
+
+
+def get_or_none(index, container):
+    try:
+        return container[index]
+    except IndexError:
+        return None
 
 
 class CassandraCoScanDataset(Dataset):
@@ -32,7 +39,6 @@ class CassandraCoScanDataset(Dataset):
         # TODO adapt keyfuncs to below
 
         self.keys = keys
-
 
         with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
             ks_meta = session.cluster.metadata.keyspaces[self.keyspace]
@@ -68,18 +74,18 @@ class CassandraCoScanDataset(Dataset):
 
                     self.keyfuncs.append(partial(take, keylen))
                     if keylen == len(tbl_meta.primary_key):
-                        self.grouptransforms.append(getter(0))
+                        self.grouptransforms.append(partial(get_or_none, 0))
                     else:
                         self.grouptransforms.append(identity)
 
 
 
-    def coscan(self, other, keys=None):
-        from bndl_cassandra.dataset import CassandraScanDataset
-        assert isinstance(other, CassandraScanDataset)
-        return CassandraCoScanDataset(*self.src + (other,), keys=keys)
+    def coscan(self, *others, keys=None):
+        assert len(others) > 0
+        return CassandraCoScanDataset(*self.src + others, keys=keys)
 
 
+    @lru_cache()
     def parts(self):
         from bndl_cassandra.dataset import CassandraScanPartition
 
@@ -87,7 +93,7 @@ class CassandraCoScanDataset(Dataset):
             size_estimates = sum((estimate_size(session, self.keyspace, src.table) for src in self.src),
                                  SizeEstimate(0, 0, 0))
 
-            partitions = partitioner.partition_ranges(self.ctx, session, self.keyspace, size_estimates=size_estimates)
+        partitions = partitioner.partition_ranges(self.ctx, self.contact_points, self.keyspace, size_estimates=size_estimates)
 
         return [
             CassandraCoScanPartition(self, idx, [CassandraScanPartition(scan, idx, *part)

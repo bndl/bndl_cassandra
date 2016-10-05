@@ -1,9 +1,12 @@
+from collections import defaultdict
+from functools import lru_cache
 from operator import itemgetter
 import copy
 import functools
 import math
 import random
 
+from bndl_cassandra.session import cassandra_session
 from cytoolz import itertoolz
 
 
@@ -46,7 +49,6 @@ class Bin(object):
         self.size = 0
 
 
-@functools.lru_cache()
 def partition_ranges_(ranges, max_length, size_estimate):
     # split ranges such that they are small enough
     # ranges which need to be split are yielded immediately, they'd fill a bin anyway
@@ -94,24 +96,26 @@ def partition_ranges_(ranges, max_length, size_estimate):
     return partitioned
 
 
-def partition_ranges(ctx, session, keyspace, table=None, size_estimates=None):
-    # estimate size of table
-    size_estimate = size_estimates or estimate_size(session, keyspace, table)
+@lru_cache()
+def partition_ranges(ctx, contact_points, keyspace, table=None, size_estimates=None):
+    with cassandra_session(ctx, contact_points=contact_points) as session:
+        # estimate size of table
+        size_estimate = size_estimates or estimate_size(session, keyspace, table)
 
-    # calculate a maximum length of a partition
-    # while the ratio of size in megabytes and keys may vary across the tokens
-    # we use the average sizes per token for both to simplify the problem
-    # to 1d bin packing (instead of vector bin packing)
-    max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
-    max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
-    max_length = T_COUNT / ctx.default_pcount
-    if size_estimate.token_size_mb:
-        max_length = min(max_length, max_size_mb / size_estimate.token_size_mb)
-    if size_estimate.token_size_keys:
-        max_length = min(max_length, max_size_keys / size_estimate.token_size_keys)
+        # calculate a maximum length of a partition
+        # while the ratio of size in megabytes and keys may vary across the tokens
+        # we use the average sizes per token for both to simplify the problem
+        # to 1d bin packing (instead of vector bin packing)
+        max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
+        max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
+        max_length = T_COUNT / ctx.default_pcount
+        if size_estimate.token_size_mb:
+            max_length = min(max_length, max_size_mb / size_estimate.token_size_mb)
+        if size_estimate.token_size_keys:
+            max_length = min(max_length, max_size_keys / size_estimate.token_size_keys)
 
-    # get token ranges, grouped by replica set
-    by_replicas = ranges_by_replicas(session, keyspace)
+        # get token ranges, grouped by replica set
+        by_replicas = ranges_by_replicas(session, keyspace)
 
     # container for the partitions (replica, ranges, size_mb, size_keys)
     partitions = []

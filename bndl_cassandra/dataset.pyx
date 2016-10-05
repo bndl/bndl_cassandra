@@ -1,4 +1,4 @@
-from functools import partial
+from functools import partial, lru_cache
 import difflib
 import functools
 import logging
@@ -10,8 +10,8 @@ from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
 from cassandra import protocol
-from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
 from cassandra.protocol import ErrorMessage
+from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
 
 
 logger = logging.getLogger(__name__)
@@ -284,15 +284,13 @@ class CassandraScanDataset(_CassandraDataset):
             return super().itake(num)
 
 
-    def coscan(self, other, keys=None):
-        assert isinstance(other, CassandraScanDataset)
-        return CassandraCoScanDataset(self, other, keys=keys)
+    def coscan(*scans, keys=None):
+        return CassandraCoScanDataset(*scans, keys=keys)
 
 
+    @lru_cache()
     def parts(self):
-        with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
-            partitions = partitioner.partition_ranges(self.ctx, session, self.keyspace, self.table)
-
+        partitions = partitioner.partition_ranges(self.ctx, self.contact_points, self.keyspace, self.table)
         return [
             CassandraScanPartition(self, i, *part)
             for i, part in enumerate(partitions)
