@@ -21,14 +21,16 @@ extensions = [
 
 try:
     from Cython.Build.Dependencies import cythonize
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, compiler_directives={
+        'language_level': 3
+    })
 except ImportError:
     pass
 
 
 setup(
     name='bndl_cassandra',
-    version='0.3.2',
+    version='0.3.3',
     url='https://stash.tgho.nl/projects/THCLUSTER/repos/bndl_cassandra/browse',
     description='Read from and write to Apache Cassandra with BNDL',
     long_description=open('README.md').read(),
