@@ -30,7 +30,7 @@ except ImportError:
 
 setup(
     name='bndl_cassandra',
-    version='0.3.3',
+    version='0.3.4',
     url='https://stash.tgho.nl/projects/THCLUSTER/repos/bndl_cassandra/browse',
     description='Read from and write to Apache Cassandra with BNDL',
     long_description=open('README.md').read(),
