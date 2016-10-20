@@ -93,7 +93,7 @@ def batch_statements(session, key, batch_size, buffer_size, statements):
             batch.size += stmt_size
 
 
-def execute_save(ctx, statement, iterable, contact_points=None):
+def execute_save(ctx, statement, iterable, keyspace=keyspace, contact_points=None):
     '''
     Save elements from an iterable given the insert/update query. Use
     cassandra_save to save a dataset. This method is useful when saving
@@ -106,8 +106,12 @@ def execute_save(ctx, statement, iterable, contact_points=None):
         The Cassandra statement to use in saving the iterable.
     :param iterable: list, tuple, generator, iterable, ...
         The values to save.
+    :param keyspace: str or None
+        The keyspace to execute the save in (if the statements don't have an
+        explicit keyspace). keyspace is supplied to ctx.cassandra_session which
+        defaults to using the 'bndl_cassandra.keyspace' setting as default value.
     :param contact_points: str, tuple, or list
-        A string or tuple/list of strings denoting hostnames (contact points)
+        A string or tuple/list of strings denoting host names (contact points)
         of the Cassandra cluster to save to. Defaults to using the ip addresses
         in the BNDL cluster.
     :return: A count of the records saved.
@@ -125,7 +129,7 @@ def execute_save(ctx, statement, iterable, contact_points=None):
     if logger.isEnabledFor(logging.INFO):
         logger.info('executing cassandra save with statement %s', statement.replace('\n', ''))
 
-    with cassandra_session(ctx, contact_points=contact_points) as session:
+    with cassandra_session(ctx, keyspace=keyspace, contact_points=contact_points) as session:
         prepared_statement = session.prepare(statement)
         prepared_statement.consistency_level = consistency_level
 
