@@ -101,13 +101,13 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
     pools = getattr(cassandra_session, 'pools', None)
     if not pools:
         cassandra_session.pools = pools = {}
+    if not keyspace:
+        keyspace = ctx.conf.get('bndl_cassandra.keyspace')
 
     # determine contact points, either given or IP addresses of the workers
     contact_points = get_contact_points(ctx, contact_points)
     # check if there is a cached session object
-    pool = pools.get(contact_points)
-    if not keyspace:
-        keyspace = ctx.conf.get('bndl_cassandra.keyspace')
+    pool = pools.get((contact_points, keyspace))
 
     # or create one if not
     if not pool:
@@ -122,7 +122,7 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
 
         def create():
             '''create a new session'''
-            pool = pools[contact_points]
+            pool = pools[(contact_points, keyspace)]
             cluster = getattr(pool, 'cluster', None)
             if not cluster or cluster.is_shutdown:
                 pool.cluster = cluster = create_cluster()
@@ -136,7 +136,7 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
             '''check if the session is not closed'''
             return not session.is_shutdown
 
-        pools[contact_points] = pool = ObjectPool(create, check, max_size=4)
+        pools[(contact_points, keyspace)] = pool = ObjectPool(create, check, max_size=4)
 
     # take a session from the pool, yield it to the caller
     # and put the session back in the pool
