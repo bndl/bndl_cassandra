@@ -93,7 +93,7 @@ def batch_statements(session, key, batch_size, buffer_size, statements):
             batch.size += stmt_size
 
 
-def execute_save(ctx, statement, iterable, keyspace=keyspace, contact_points=None):
+def execute_save(ctx, statement, iterable, keyspace=None, contact_points=None):
     '''
     Save elements from an iterable given the insert/update query. Use
     cassandra_save to save a dataset. This method is useful when saving
