@@ -1,8 +1,6 @@
-from collections import defaultdict
 from functools import lru_cache
 from operator import itemgetter
 import copy
-import functools
 import math
 import random
 
