@@ -1,17 +1,19 @@
-from functools import partial, lru_cache
+from functools import partial
 import difflib
 import functools
 import logging
 
-from bndl.compute.dataset import Dataset, Partition
+from cassandra import protocol
+from cassandra.protocol import ErrorMessage
+from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
+
+from bndl.compute.dataset import Dataset, Partition, NODE_LOCAL
+from bndl.compute.explain import callsite
 from bndl.util import funcs
 from bndl.util.retry import do_with_retry
 from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
-from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
-from cassandra import protocol
-from cassandra.protocol import ErrorMessage
-from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
+from bndl_cassandra.session import TRANSIENT_ERRORS
 
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,6 @@ def _arrays_to_df(pk_cols_selected, arrays):
 
 
 
-
 class CassandraScanDataset(_CassandraDataset):
     def __init__(self, ctx, keyspace, table, contact_points=None):
         '''
@@ -146,6 +147,7 @@ class CassandraScanDataset(_CassandraDataset):
         return self._with(_where_clause=clause, _where_values=values)
 
 
+    @callsite()
     def count(self, push_down=None):
         if push_down is True or (not self.cached and push_down is None):
             return self.select('count(*)').as_tuples().map(funcs.getter(0)).sum()
@@ -288,7 +290,6 @@ class CassandraScanDataset(_CassandraDataset):
         return CassandraCoScanDataset(*scans, keys=keys)
 
 
-    @lru_cache()
     def parts(self):
         partitions = partitioner.partition_ranges(self.ctx, self.contact_points, self.keyspace, self.table)
         return [
@@ -336,9 +337,9 @@ class CassandraScanPartition(Partition):
         return results
 
 
-    def _materialize(self, ctx):
-        retry_count = max(0, ctx.conf.get('bndl_cassandra.read_retry_count'))
-        retry_backoff = ctx.conf.get('bndl_cassandra.read_retry_backoff')
+    def _compute(self):
+        retry_count = max(0, self.dset.ctx.conf.get('bndl_cassandra.read_retry_count'))
+        retry_backoff = self.dset.ctx.conf.get('bndl_cassandra.read_retry_backoff')
 
         with self.dset._session() as session:
             logger.debug('scanning %s token ranges', len(self.token_ranges))
@@ -347,9 +348,9 @@ class CassandraScanPartition(Partition):
                                          retry_count, retry_backoff, TRANSIENT_ERRORS)
 
 
-    def _preferred_workers(self, workers):
-        return [
-            worker
+    def _locality(self, workers):
+        return (
+            (worker, NODE_LOCAL)
             for worker in workers
-            if worker.ip_addresses & self.replicas
-        ]
+            if worker.ip_addresses() & self.replicas
+        )

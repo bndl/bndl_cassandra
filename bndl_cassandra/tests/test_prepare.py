@@ -9,7 +9,7 @@ class QueryPrepareTest(CassandraTest):
         # trigger query preparation
         dset = self.ctx.cassandra_table(self.keyspace, self.table)
         for i in range(self.ctx.worker_count):
-            targeted = dset.allow_workers(lambda workers: [workers[i]])
+            targeted = dset.require_workers(lambda workers: [list(workers)[i]])
             self.assertEqual(targeted.collect(), [])
 
         # check that prepared query is cached

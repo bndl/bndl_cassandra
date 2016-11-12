@@ -4,7 +4,7 @@ import math
 from bndl_cassandra.session import cassandra_session
 
 
-def get_cassandra_metrics(worker):
+def get_cassandra_metrics():
     try:
         pools = getattr(cassandra_session, 'pools')
     except AttributeError:

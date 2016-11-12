@@ -84,9 +84,9 @@ def _get_contact_points(ctx, *contact_points):
     if not contact_points:
         contact_points = set()
         for worker in ctx.workers:
-            contact_points |= worker.ip_addresses
+            contact_points |= worker.ip_addresses()
     if not contact_points:
-        contact_points = ctx.node.ip_addresses
+        contact_points = ctx.node.ip_addresses()
     if isinstance(contact_points, str):
         contact_points = [contact_points]
     if isinstance(contact_points, Sequence) and len(contact_points) == 1 and isinstance(contact_points[0], str):
@@ -116,7 +116,7 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
                 contact_points,
                 port=ctx.conf.get('bndl_cassandra.port'),
                 compression=ctx.conf.get('bndl_cassandra.compression'),
-                load_balancing_policy=LocalNodeFirstPolicy(DCAwareRoundRobinPolicy(), ctx.node.ip_addresses),
+                load_balancing_policy=LocalNodeFirstPolicy(DCAwareRoundRobinPolicy(), ctx.node.ip_addresses()),
                 metrics_enabled=ctx.conf.get('bndl_cassandra.metrics_enabled'),
             )
 

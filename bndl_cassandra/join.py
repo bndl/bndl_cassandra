@@ -87,11 +87,12 @@ class CassandraJoinPartition(Partition):
     def __init__(self, dset, src):
         super().__init__(dset, src.idx, src)
 
-    def _materialize(self, ctx):
+    def _compute(self):
+        ctx = self.dset.ctx
         key = self.dset._key
         join_type = self.dset._join_type
         on_primary = self.dset._on_primary
-        data = self.src.materialize(ctx)
+        data = self.src.compute()
 
         timeout = self.dset.ctx.conf.get('bndl_cassandra.read_timeout')
         retry_count = max(0, ctx.conf.get('bndl_cassandra.read_retry_count'))

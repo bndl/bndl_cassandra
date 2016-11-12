@@ -22,15 +22,25 @@ def get_or_none(index, container):
 class CassandraCoScanDataset(Dataset):
     def __init__(self, *scans, keys=None, dset_id=None):
         assert len(scans) > 1
-        super().__init__(scans[0].ctx, src=scans, dset_id=dset_id)
+        scans = list(scans)
+        scan0 = scans[0]
 
-        for scan in scans[1:]:
-            assert scan.contact_points == scans[0].contact_points, "only scan in parallel within the same cluster"
-            assert scan.keyspace == scans[0].keyspace, "only scan in parallel within the same keyspace"
+        super().__init__(scan0.ctx, src=scans, dset_id=dset_id)
+
+        for idx, scan in enumerate(scans[1:], 1):
+            if isinstance(scan, str):
+                if '.' in scan:
+                    keyspace, table = scan.split('.', 1)
+                else:
+                    keyspace, table = scan0.keyspace, scan
+                scan = self.ctx.cassandra_table(keyspace, table)
+                scans[idx] = scan
+            assert scan.contact_points == scan0.contact_points, "only scan in parallel within the same cluster"
+            assert scan.keyspace == scan0.keyspace, "only scan in parallel within the same keyspace"
         assert len(set(scan.table for scan in scans)) == len(scans), "don't scan the same table twice"
 
-        self.contact_points = scans[0].contact_points
-        self.keyspace = scans[0].keyspace
+        self.contact_points = scan0.contact_points
+        self.keyspace = scan0.keyspace
 
         self.srcparts = [src.parts() for src in scans]
         self.pcount = len(self.srcparts[0])
@@ -38,7 +48,10 @@ class CassandraCoScanDataset(Dataset):
         # TODO check format (dicts, tuples, namedtuples, etc.)
         # TODO adapt keyfuncs to below
 
-        self.keys = keys
+        if isinstance(keys, str):
+            self.keys = keys = [keys] * len(scans)
+        else:
+            self.keys = keys
 
         with cassandra_session(self.ctx, contact_points=self.contact_points) as session:
             ks_meta = session.cluster.metadata.keyspaces[self.keyspace]
@@ -82,7 +95,7 @@ class CassandraCoScanDataset(Dataset):
 
     def coscan(self, *others, keys=None):
         assert len(others) > 0
-        return CassandraCoScanDataset(*self.src + others, keys=keys)
+        return CassandraCoScanDataset(*tuple(self.src) + others, keys=keys)
 
 
     @lru_cache()
@@ -107,14 +120,16 @@ class CassandraCoScanPartition(Partition):
         super().__init__(dset, idx)
         self.scans = scans
 
-    def _preferred_workers(self, workers):
-        return self.scans[0].preferred_workers(workers)
 
-    def _materialize(self, ctx):
+    def _locality(self, workers):
+        return self.scans[0]._locality(workers)
+
+
+    def _compute(self):
         keyfuncs = self.dset.keyfuncs
         grouptransforms = self.dset.grouptransforms
 
-        subscans = [scan.materialize(ctx) for scan in self.scans]
+        subscans = [scan.compute() for scan in self.scans]
         merged = {}
 
         for cidx, scan in enumerate(subscans):
