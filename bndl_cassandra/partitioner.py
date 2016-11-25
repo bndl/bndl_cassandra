@@ -94,7 +94,9 @@ def partition_ranges_(ranges, max_length, size_estimate):
     return partitioned
 
 
+@lru_cache()
 def partition_ranges(ctx, contact_points, keyspace, table=None, size_estimates=None):
+    assert table or size_estimates
     with cassandra_session(ctx, contact_points=contact_points) as session:
         # estimate size of table
         size_estimate = size_estimates or estimate_size(session, keyspace, table)
