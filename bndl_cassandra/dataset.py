@@ -8,8 +8,8 @@ from cassandra.protocol import ErrorMessage
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
 
 from bndl.compute.dataset import Dataset, Partition, NODE_LOCAL
-from bndl.compute.explain import callsite
 from bndl.util import funcs
+from bndl.util.callsite import callsite
 from bndl.util.retry import do_with_retry
 from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
