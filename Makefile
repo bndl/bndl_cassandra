@@ -23,7 +23,7 @@ test:
 	coverage xml -o build/coverage.xml
 
 codestyle:
-	pylint bndl_cassandra > build/pylint.html || :
+	pylint bndl_cassandra > build/pylint.log || :
 	flake8 bndl_cassandra > build/flake8.txt || :
 
 
