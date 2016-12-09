@@ -13,7 +13,7 @@ setup(
     author_email='mail@frensjan.nl',
 
     packages=(
-        find_packages(exclude=["*.tests", "*.tests.*"])
+        find_packages()
     ),
 
     include_package_data=True,
