@@ -1,4 +1,4 @@
-CASSANDRA_VERSION ?= 3.7
+CASSANDRA_VERSION ?= 3.9
 
 .PHONY: clean test codestyle install-cassandra start-cassandra stop-cassandra  
 
