@@ -7,13 +7,6 @@ BNDL Cassandra Documentation
 
 Contents
 --------
-
-.. toctree::
-   :hidden:
-
-   self
-
-
 .. toctree::
    :maxdepth: 2
    :titlesonly:
