@@ -1,6 +1,6 @@
 CASSANDRA_VERSION ?= 3.9
 
-.PHONY: clean test codestyle install-cassandra start-cassandra stop-cassandra  
+.PHONY: clean test codestyle install-cassandra start-cassandra stop-cassandra
 
 clean:
 	find bndl_cassandra -name '*.pyc' -exec rm -f {} +
@@ -28,7 +28,6 @@ codestyle:
 
 
 install-cassandra:
-	pip install ccm
 	ccm list | grep bndl_test || ccm create bndl_test -v binary:$(CASSANDRA_VERSION) -n 1
 
 start-cassandra: install-cassandra
