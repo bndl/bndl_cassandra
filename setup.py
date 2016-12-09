@@ -1,14 +1,21 @@
 #!/usr/bin/env python
 
+import os.path
+
 from setuptools import setup, find_packages
 
 
+with open(os.path.join(os.path.dirname(__file__), 'bndl_cassandra', '__version__.py')) as f:
+    version = {}
+    exec(f.read(), version)
+    version = version['version']
+
 setup(
     name='bndl_cassandra',
-    version='0.5.2',
+    version=version,
     url='https://stash.tgho.nl/projects/THCLUSTER/repos/bndl_cassandra/browse',
     description='Read from and write to Apache Cassandra with BNDL',
-    long_description=open('README.md').read(),
+    long_description=open('README.rst').read(),
     author='Frens Jan Rumph',
     author_email='mail@frensjan.nl',
 
