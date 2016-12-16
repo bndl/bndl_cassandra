@@ -64,7 +64,7 @@ class CassandraCoScanDataset(Dataset):
                         "can't co-scan without keys with varying primary key length"
 
                 self.keyfuncs = [partial(take, primary_key_length)] * len(scans)
-                self.grouptransforms = [getter(0)] * len(scans)
+                self.grouptransforms = [partial(get_or_none, 0)] * len(scans)
 
             else:
                 assert len(keys) == len(scans), \
