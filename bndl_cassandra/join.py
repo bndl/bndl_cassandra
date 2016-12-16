@@ -31,7 +31,7 @@ class CassandraJoinDataset(_CassandraDataset):
         table) and set a key to select the corresponding values from the
         dataset to join.
 
-        :param columns: sequence[string] optional
+        :param columns: sequence[str], optional
             The columns to join on. Must be a left subset of the primary key.
             The following must hold: primary_key[:len(columns)] == columns.
             When the full primary key is selected, the rows yielded will be
@@ -40,12 +40,12 @@ class CassandraJoinDataset(_CassandraDataset):
             partition key columns and perhaps some clustering columns), a list
             of selected rows is yielded.
 
-        :param key: callable(element), sequence[string], object optional
+        :param key: callable(element), list[object] or object, optional
             The key for getting the values to query Cassandra with. Must be a
             * callable which returns a sequence for each element in this
-              dataset with the values to use.
-            * or a sequence of strings to be used as index in each element
-              in a operator.itemgetter(*columns) fashion (i.e. using the
+              dataset with the values to use in the join.
+            * or a list of objects to be used as index in each element
+              in a toolz.getter(columns) fashion (i.e. using the
               __getitem__ protocol)
             * or a plain value to be used with the __getitem__ mechanism
         '''
