@@ -1,0 +1,14 @@
+language: python
+
+python:
+  - 3.5-dev
+
+services:
+  - cassandra
+
+install:
+  - pip install pip --upgrade
+  - pip install -e .[dev]
+
+script: make test
+
