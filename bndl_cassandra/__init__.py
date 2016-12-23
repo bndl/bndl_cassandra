@@ -5,7 +5,7 @@ from bndl.compute.dataset import Dataset
 from bndl.util.conf import Int, Float, CSV, String, Bool, Attr
 from bndl.util.funcs import as_method
 from bndl_cassandra.dataset import CassandraScanDataset
-from bndl_cassandra.save import cassandra_save
+from bndl_cassandra.save import cassandra_save, cassandra_execute
 from bndl_cassandra.session import cassandra_session
 from bndl_cassandra.join import CassandraJoinDataset
 from cassandra import ConsistencyLevel
@@ -46,5 +46,6 @@ write_batch_buffer_size = Int(1000)
 # Bndl API extensions
 ComputeContext.cassandra_session = as_method(cassandra_session)
 ComputeContext.cassandra_table = as_method(CassandraScanDataset)
+Dataset.cassandra_execute = as_method(cassandra_execute)
 Dataset.cassandra_save = as_method(cassandra_save)
 Dataset.join_with_cassandra = as_method(CassandraJoinDataset)
