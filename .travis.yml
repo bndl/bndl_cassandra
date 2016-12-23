@@ -11,11 +11,15 @@ sudo: required
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install liblapack-dev libopenblas-dev libatlas-base-dev gfortran
+  - git clone git://github.com/bndl/bndl.git
+  - pip install -e "bndl[dev]"
 
 install:
-  - pip install -e git://github.com/bndl/bndl.git@master#egg=bndl
   - pip install pip --upgrade
   - pip install -e .[dev]
 
 script: make test
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
 
