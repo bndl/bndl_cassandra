@@ -3,8 +3,8 @@ language: python
 python:
   - 3.5-dev
 
-services:
-  - cassandra
+#services:
+#  - cassandra
 
 sudo: required
 
@@ -13,6 +13,11 @@ before_install:
   - sudo apt-get install liblapack-dev libopenblas-dev libatlas-base-dev gfortran
   - git clone git://github.com/bndl/bndl.git
   - pip install -e "bndl[dev]"
+
+  - sudo rm -rf /var/lib/cassandra/*
+  - wget http://www.us.apache.org/dist/cassandra/3.9/apache-cassandra-3.9-bin.tar.gz && tar -xvzf apache-cassandra-3.9-bin.tar.gz
+  - sudo sh ./apache-cassandra-3.9/bin/cassandra -R
+  - sleep 10
 
 install:
   - pip install pip --upgrade
