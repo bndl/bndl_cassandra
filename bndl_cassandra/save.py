@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import timedelta, date, datetime
 from functools import partial
 from threading import Condition
-import functools
 import logging
 
 from bndl.util.retry import retry_delay
@@ -203,6 +202,26 @@ def execute_save(ctx, statement, iterable, keyspace=None, contact_points=None):
     return (saved,)
 
 
+def cassandra_execute(dataset, statement, keyspace=None, contact_points=None):
+    '''
+    Execute a CQL statement per element in the dataset.
+
+    :param dataset: bndl.compute.context.ComputationContext
+        As the cassandra_save function is typically bound on ComputationContext
+        this corresponds to self.
+    :param statement: str
+        The CQL statement to execute.
+    :param keyspace: str
+        The name of the Cassandra keyspace to save to.
+    :param contact_points: str, tuple, or list
+        A string or tuple/list of strings denoting hostnames (contact points)
+        of the Cassandra cluster to save to. Defaults to using the ip addresses
+        in the BNDL cluster.
+    '''
+    return dataset.map_partitions(execute_save, dataset.ctx, statement, keyspace=keyspace,
+                                  contact_points=contact_points)
+
+
 def cassandra_save(dataset, keyspace, table, columns=None, keyed_rows=True,
                    ttl=None, timestamp=None, contact_points=None):
     '''
@@ -281,5 +300,4 @@ def cassandra_save(dataset, keyspace, table, columns=None, keyed_rows=True,
         using=using,
     )
 
-    do_save = functools.partial(execute_save, dataset.ctx, insert, contact_points=contact_points)
-    return dataset.map_partitions(do_save)
+    return dataset.cassandra_execute(insert, contact_points=contact_points)
