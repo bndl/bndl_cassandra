@@ -6,7 +6,14 @@ python:
 services:
   - cassandra
 
+sudo: required
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install liblapack-dev libopenblas-dev libatlas-base-dev gfortran
+
 install:
+  - pip install -e git://github.com/bndl/bndl.git@master#egg=bndl
   - pip install pip --upgrade
   - pip install -e .[dev]
 
