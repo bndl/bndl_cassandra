@@ -6,6 +6,13 @@ BNDL Cassandra exposes loading from and saving to functionality of the
 `Datastax python driver <https://github.com/datastax/python-driver>`_ for
 `Apache Cassandra <http://cassandra.apache.org/>`_.
 
+Master branch build status: |travis| |codecov|
+
+.. |travis| image:: https://travis-ci.org/bndl/bndl_cassandra.svg?branch=master
+   :target: https://travis-ci.org/bndl/bndl_cassandra
+
+.. |codecov| image:: https://codecov.io/gh/bndl/bndl_cassandra/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/bndl/bndl_cassandra/branch/master
 ---------------------------------------------------------------------------------------------------
 
 BNDL Cassandra can be installed through pip::
