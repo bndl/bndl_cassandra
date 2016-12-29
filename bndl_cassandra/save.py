@@ -258,12 +258,12 @@ def cassandra_save(dataset, keyspace, table, columns=None, keyed_rows=True,
 
     Example:
 
-        >>> ctx.collection([{'key': 1, 'val': 'a' }, {'key': 2, 'val': 'b' },]) \
-               .cassandra_save('keyspace', 'table') \
+        >>> ctx.collection([{'key': 1, 'val': 'a' }, {'key': 2, 'val': 'b' },])
+               .cassandra_save('keyspace', 'table')
                .execute()
-        >>> ctx.range(100) \
-               .map(lambda i: {'key': i, 'val': str(i) } \
-               .cassandra_save('keyspace', 'table') \
+        >>> ctx.range(100)
+               .map(lambda i: {'key': i, 'val': str(i) }
+               .cassandra_save('keyspace', 'table')
                .sum()
         100
     '''
