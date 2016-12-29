@@ -1,0 +1,421 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>bndl_cassandra.partitioner &mdash; bndl-cassandra 0.5.4 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+        <link rel="copyright" title="Copyright" href="../../copyright.html"/>
+    <link rel="top" title="bndl-cassandra 0.5.4 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> bndl-cassandra
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compatibility.html">Compatibility</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../issues.html">Known issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">bndl-cassandra</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>bndl_cassandra.partitioner</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for bndl_cassandra.partitioner</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">lru_cache</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="k">import</span> <span class="n">itemgetter</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="kn">from</span> <span class="nn">bndl_cassandra.session</span> <span class="k">import</span> <span class="n">cassandra_session</span>
+<span class="kn">from</span> <span class="nn">cytoolz</span> <span class="k">import</span> <span class="n">itertoolz</span>
+
+
+<span class="n">T_COUNT</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">64</span>
+<span class="n">T_MIN</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">63</span><span class="p">)</span>
+<span class="n">T_MAX</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">63</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="get_token_ranges"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.get_token_ranges">[docs]</a><span class="k">def</span> <span class="nf">get_token_ranges</span><span class="p">(</span><span class="n">ring</span><span class="p">):</span>
+    <span class="n">ring</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">ring</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">ring</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">T_MIN</span><span class="p">:</span>
+        <span class="n">ring</span> <span class="o">=</span> <span class="p">[</span><span class="n">T_MIN</span><span class="p">]</span> <span class="o">+</span> <span class="n">ring</span>
+    <span class="k">if</span> <span class="n">ring</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">T_MAX</span><span class="p">:</span>
+        <span class="n">ring</span> <span class="o">=</span> <span class="n">ring</span> <span class="o">+</span> <span class="p">[</span><span class="n">T_MAX</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">ring</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ring</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span></div>
+
+
+<div class="viewcode-block" id="replicas_for_token"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.replicas_for_token">[docs]</a><span class="k">def</span> <span class="nf">replicas_for_token</span><span class="p">(</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">token_map</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+    <span class="n">replicas</span> <span class="o">=</span> <span class="n">token_map</span><span class="o">.</span><span class="n">get_replicas</span><span class="p">(</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">token_map</span><span class="o">.</span><span class="n">token_class</span><span class="p">(</span><span class="n">token</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">replica</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">replica</span> <span class="ow">in</span> <span class="n">replicas</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ranges_by_replicas"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.ranges_by_replicas">[docs]</a><span class="k">def</span> <span class="nf">ranges_by_replicas</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">):</span>
+    <span class="c1"># get raw ranges from token ring</span>
+    <span class="n">token_map</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">cluster</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">token_map</span>
+    <span class="n">raw_ranges</span> <span class="o">=</span> <span class="n">get_token_ranges</span><span class="p">(</span><span class="n">token_map</span><span class="o">.</span><span class="n">ring</span><span class="p">)</span>
+
+    <span class="c1"># group by replica</span>
+    <span class="k">return</span> <span class="n">itertoolz</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">replicas_for_token</span><span class="p">(</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">token_map</span><span class="p">,</span> <span class="n">start</span><span class="p">),</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">raw_ranges</span>
+    <span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Bin"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.Bin">[docs]</a><span class="k">class</span> <span class="nc">Bin</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Bin.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.Bin.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ranges</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="mi">0</span></div></div>
+
+
+<div class="viewcode-block" id="partition_ranges_"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.partition_ranges_">[docs]</a><span class="k">def</span> <span class="nf">partition_ranges_</span><span class="p">(</span><span class="n">ranges</span><span class="p">,</span> <span class="n">max_length</span><span class="p">,</span> <span class="n">size_estimate</span><span class="p">):</span>
+    <span class="c1"># split ranges such that they are small enough</span>
+    <span class="c1"># ranges which need to be split are yielded immediately, they&#39;d fill a bin anyway</span>
+    <span class="c1"># the ranges smaller than max_length are put into a list for binning</span>
+    <span class="c1"># and sorted larger &gt; smaller (First Fit Decreasing strategy)</span>
+    <span class="n">partitioned</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">sorted_ranges</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">ranges</span><span class="p">:</span>
+        <span class="n">length</span> <span class="o">=</span> <span class="n">end</span> <span class="o">-</span> <span class="n">start</span>
+        <span class="k">if</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">max_length</span><span class="p">)</span>
+            <span class="n">step</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">length</span> <span class="o">/</span> <span class="p">(</span><span class="n">parts</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">parts</span><span class="p">):</span>
+                <span class="n">partitioned</span><span class="o">.</span><span class="n">append</span><span class="p">((((</span><span class="n">start</span><span class="p">,</span> <span class="n">start</span> <span class="o">+</span> <span class="n">step</span><span class="p">),),</span> <span class="n">step</span><span class="p">))</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">step</span>
+            <span class="n">partitioned</span><span class="o">.</span><span class="n">append</span><span class="p">((((</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">),),</span> <span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sorted_ranges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+    <span class="c1"># Sort biggest first</span>
+    <span class="n">sorted_ranges</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># container for the bins for this replica set</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="n">Bin</span><span class="p">()]</span>
+
+    <span class="c1"># build one big partition out of the ranges for this replica set</span>
+    <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">sorted_ranges</span><span class="p">:</span>
+        <span class="nb">bin</span> <span class="o">=</span> <span class="n">bins</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># see if it fits in the first (least loaded bin)</span>
+        <span class="k">if</span> <span class="nb">bin</span><span class="o">.</span><span class="n">size</span> <span class="o">+</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+            <span class="c1"># create a new bin if none found</span>
+            <span class="nb">bin</span> <span class="o">=</span> <span class="n">Bin</span><span class="p">()</span>
+            <span class="n">bins</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">bin</span><span class="p">)</span>
+        <span class="c1"># add the token range to the bin</span>
+        <span class="nb">bin</span><span class="o">.</span><span class="n">ranges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">))</span>
+        <span class="nb">bin</span><span class="o">.</span><span class="n">size</span> <span class="o">+=</span> <span class="n">length</span>
+
+        <span class="c1"># sort the bins so that the least loaded bin is the first candidate</span>
+        <span class="n">bins</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="nb">bin</span><span class="p">:</span> <span class="nb">bin</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="nb">bin</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">bin</span><span class="o">.</span><span class="n">size</span><span class="p">:</span>
+            <span class="n">partitioned</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="nb">bin</span><span class="o">.</span><span class="n">ranges</span><span class="p">,</span> <span class="nb">bin</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">partitioned</span></div>
+
+
+<span class="nd">@lru_cache</span><span class="p">()</span>
+<div class="viewcode-block" id="partition_ranges"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.partition_ranges">[docs]</a><span class="k">def</span> <span class="nf">partition_ranges</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">contact_points</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">size_estimates</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">table</span> <span class="ow">or</span> <span class="n">size_estimates</span>
+    <span class="k">with</span> <span class="n">cassandra_session</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+        <span class="c1"># estimate size of table</span>
+        <span class="n">size_estimate</span> <span class="o">=</span> <span class="n">size_estimates</span> <span class="ow">or</span> <span class="n">estimate_size</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+
+        <span class="c1"># calculate a maximum length of a partition</span>
+        <span class="c1"># while the ratio of size in megabytes and keys may vary across the tokens</span>
+        <span class="c1"># we use the average sizes per token for both to simplify the problem</span>
+        <span class="c1"># to 1d bin packing (instead of vector bin packing)</span>
+        <span class="n">max_size_mb</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.part_size_mb&#39;</span><span class="p">)</span>
+        <span class="n">max_size_keys</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.part_size_keys&#39;</span><span class="p">)</span>
+        <span class="n">max_length</span> <span class="o">=</span> <span class="n">T_COUNT</span> <span class="o">/</span> <span class="n">ctx</span><span class="o">.</span><span class="n">default_pcount</span>
+        <span class="k">if</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_mb</span><span class="p">:</span>
+            <span class="n">max_length</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">max_length</span><span class="p">,</span> <span class="n">max_size_mb</span> <span class="o">/</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_mb</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">:</span>
+            <span class="n">max_length</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">max_length</span><span class="p">,</span> <span class="n">max_size_keys</span> <span class="o">/</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">)</span>
+
+        <span class="c1"># get token ranges, grouped by replica set</span>
+        <span class="n">by_replicas</span> <span class="o">=</span> <span class="n">ranges_by_replicas</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">)</span>
+
+    <span class="c1"># container for the partitions (replica, ranges, size_mb, size_keys)</span>
+    <span class="n">partitions</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># divide the token ranges in partitions, joining ranges for the same replica set</span>
+    <span class="c1"># but limited in size (in bytes and Cassandra partition keys)</span>
+    <span class="c1"># A greedy bin packing algorithm is used</span>
+
+    <span class="k">for</span> <span class="n">replicas</span><span class="p">,</span> <span class="n">ranges</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">by_replicas</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+        <span class="n">ranges</span> <span class="o">=</span> <span class="n">itertoolz</span><span class="o">.</span><span class="n">pluck</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">ranges</span><span class="p">)</span>
+        <span class="n">partitioned</span> <span class="o">=</span> <span class="n">partition_ranges_</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ranges</span><span class="p">),</span> <span class="n">max_length</span><span class="p">,</span> <span class="n">size_estimate</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ranges</span><span class="p">,</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">partitioned</span><span class="p">:</span>
+            <span class="n">partitions</span><span class="o">.</span><span class="n">append</span><span class="p">((</span>
+                <span class="n">replicas</span><span class="p">,</span> <span class="n">ranges</span><span class="p">,</span>
+                <span class="n">size</span> <span class="o">*</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_mb</span><span class="p">,</span>
+                <span class="n">size</span> <span class="o">*</span> <span class="n">size_estimate</span><span class="o">.</span><span class="n">token_size_keys</span>
+            <span class="p">))</span>
+
+    <span class="c1"># shuffle the partitions so that load is spread over the replica sets</span>
+    <span class="c1"># use a fixed seed so that the &#39;randomness&#39; is fixed</span>
+    <span class="n">random</span><span class="o">.</span><span class="n">Random</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">partitions</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">partitions</span></div>
+
+
+
+<div class="viewcode-block" id="SizeEstimate"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate">[docs]</a><span class="k">class</span> <span class="nc">SizeEstimate</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="SizeEstimate.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">partitions</span><span class="p">,</span> <span class="n">fraction</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">fraction</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">size</span> <span class="o">/</span> <span class="n">fraction</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">partitions</span> <span class="o">/</span> <span class="n">fraction</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span><span class="p">)</span> <span class="o">/</span> <span class="n">T_COUNT</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span><span class="p">)</span> <span class="o">/</span> <span class="n">T_COUNT</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="SizeEstimate.__add__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__add__">[docs]</a>    <span class="k">def</span> <span class="nf">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="n">est</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">est</span> <span class="o">+=</span> <span class="n">other</span>
+        <span class="k">return</span> <span class="n">est</span></div>
+
+<div class="viewcode-block" id="SizeEstimate.__iadd__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__iadd__">[docs]</a>    <span class="k">def</span> <span class="nf">__iadd__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span> <span class="o">+=</span> <span class="n">other</span><span class="o">.</span><span class="n">table_size_mb</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span> <span class="o">+=</span> <span class="n">other</span><span class="o">.</span><span class="n">table_size_pk</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span> <span class="o">+</span> <span class="n">other</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="o">+</span> <span class="n">other</span><span class="o">.</span><span class="n">token_size_mb</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+<div class="viewcode-block" id="SizeEstimate.__hash__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__hash__">[docs]</a>    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span><span class="p">)</span> <span class="o">^</span>
+                <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span><span class="p">)</span> <span class="o">^</span>
+                <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span><span class="p">)</span> <span class="o">^</span>
+                <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="SizeEstimate.__eq__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__eq__">[docs]</a>    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">table_size_mb</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">table_size_pk</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">token_size_mb</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SizeEstimate.__repr__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.SizeEstimate.__repr__">[docs]</a>    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;&lt;SizeEstimate: size=</span><span class="si">%s</span><span class="s1">, partitions=</span><span class="si">%s</span><span class="s1">, partitions / token=</span><span class="si">%s</span><span class="s1">, token size=</span><span class="si">%s</span><span class="s1">&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_mb</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_size_pk</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_keys</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_mb</span>
+        <span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="estimate_size"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.partitioner.estimate_size">[docs]</a><span class="k">def</span> <span class="nf">estimate_size</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+    <span class="n">size_estimate_query</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">        select range_start, range_end, partitions_count, mean_partition_size</span>
+<span class="s1">        from system.size_estimates</span>
+<span class="s1">        where keyspace_name = </span><span class="si">%s</span><span class="s1"> and table_name = </span><span class="si">%s</span><span class="s1"></span>
+<span class="s1">    &#39;&#39;&#39;</span>
+    <span class="n">size_estimates</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">size_estimate_query</span><span class="p">,</span> <span class="p">(</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">)))</span>
+
+    <span class="n">size_b</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">size_pk</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">size_estimates</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">range_estimate</span> <span class="o">=</span> <span class="n">size_estimates</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">size_pk</span> <span class="o">=</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">partitions_count</span>
+        <span class="n">size_b</span> <span class="o">=</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">mean_partition_size</span> <span class="o">*</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">partitions_count</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="n">T_COUNT</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">range_estimate</span> <span class="ow">in</span> <span class="n">size_estimates</span><span class="p">:</span>
+            <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">range_estimate</span><span class="o">.</span><span class="n">range_start</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">range_estimate</span><span class="o">.</span><span class="n">range_end</span><span class="p">)</span>
+            <span class="c1"># don&#39;t bother unwrapping the token range crossing 0</span>
+            <span class="k">if</span> <span class="n">start</span> <span class="o">&gt;</span> <span class="n">end</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="c1"># count partitions, bytes and size of the token range</span>
+            <span class="n">size_pk</span> <span class="o">+=</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">partitions_count</span>
+            <span class="n">size_b</span> <span class="o">+=</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">mean_partition_size</span> <span class="o">*</span> <span class="n">range_estimate</span><span class="o">.</span><span class="n">partitions_count</span>
+            <span class="n">tokens</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">range_estimate</span><span class="o">.</span><span class="n">range_end</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">range_estimate</span><span class="o">.</span><span class="n">range_start</span><span class="p">)</span>
+
+    <span class="n">fraction</span> <span class="o">=</span> <span class="n">tokens</span> <span class="o">/</span> <span class="n">T_COUNT</span>
+
+    <span class="k">return</span> <span class="n">SizeEstimate</span><span class="p">(</span><span class="n">size_b</span> <span class="o">/</span> <span class="mi">1024</span> <span class="o">/</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">size_pk</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; <a href="../../copyright.html">Copyright</a> 2016, Frens Jan Rumph.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.5.4',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

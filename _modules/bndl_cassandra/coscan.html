@@ -1,0 +1,348 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>bndl_cassandra.coscan &mdash; bndl-cassandra 0.5.4 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+        <link rel="copyright" title="Copyright" href="../../copyright.html"/>
+    <link rel="top" title="bndl-cassandra 0.5.4 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> bndl-cassandra
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compatibility.html">Compatibility</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../issues.html">Known issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">bndl-cassandra</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>bndl_cassandra.coscan</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for bndl_cassandra.coscan</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">lru_cache</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">bndl.compute.dataset</span> <span class="k">import</span> <span class="n">Dataset</span><span class="p">,</span> <span class="n">Partition</span>
+<span class="kn">from</span> <span class="nn">bndl.util.funcs</span> <span class="k">import</span> <span class="n">identity</span><span class="p">,</span> <span class="n">getter</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra</span> <span class="k">import</span> <span class="n">partitioner</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra.partitioner</span> <span class="k">import</span> <span class="n">estimate_size</span><span class="p">,</span> <span class="n">SizeEstimate</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra.session</span> <span class="k">import</span> <span class="n">cassandra_session</span>
+<span class="kn">from</span> <span class="nn">cytoolz.itertoolz</span> <span class="k">import</span> <span class="n">take</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="get_or_none"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.get_or_none">[docs]</a><span class="k">def</span> <span class="nf">get_or_none</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">container</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">container</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="CassandraCoScanDataset"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanDataset">[docs]</a><span class="k">class</span> <span class="nc">CassandraCoScanDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<div class="viewcode-block" id="CassandraCoScanDataset.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanDataset.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">scans</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dset_id</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="n">scans</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">scans</span><span class="p">)</span>
+        <span class="n">scan0</span> <span class="o">=</span> <span class="n">scans</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">scan0</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">scans</span><span class="p">,</span> <span class="n">dset_id</span><span class="o">=</span><span class="n">dset_id</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">scan</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">scans</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">scan</span><span class="p">:</span>
+                    <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span> <span class="o">=</span> <span class="n">scan</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span> <span class="o">=</span> <span class="n">scan0</span><span class="o">.</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">scan</span>
+                <span class="n">scan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">cassandra_table</span><span class="p">(</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+                <span class="n">scans</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">scan</span>
+            <span class="k">assert</span> <span class="n">scan</span><span class="o">.</span><span class="n">contact_points</span> <span class="o">==</span> <span class="n">scan0</span><span class="o">.</span><span class="n">contact_points</span><span class="p">,</span> <span class="s2">&quot;only scan in parallel within the same cluster&quot;</span>
+            <span class="k">assert</span> <span class="n">scan</span><span class="o">.</span><span class="n">keyspace</span> <span class="o">==</span> <span class="n">scan0</span><span class="o">.</span><span class="n">keyspace</span><span class="p">,</span> <span class="s2">&quot;only scan in parallel within the same keyspace&quot;</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">scan</span><span class="o">.</span><span class="n">table</span> <span class="k">for</span> <span class="n">scan</span> <span class="ow">in</span> <span class="n">scans</span><span class="p">))</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">),</span> <span class="s2">&quot;don&#39;t scan the same table twice&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">contact_points</span> <span class="o">=</span> <span class="n">scan0</span><span class="o">.</span><span class="n">contact_points</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">keyspace</span> <span class="o">=</span> <span class="n">scan0</span><span class="o">.</span><span class="n">keyspace</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">srcparts</span> <span class="o">=</span> <span class="p">[</span><span class="n">src</span><span class="o">.</span><span class="n">parts</span><span class="p">()</span> <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">scans</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pcount</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">srcparts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># TODO check format (dicts, tuples, namedtuples, etc.)</span>
+        <span class="c1"># TODO adapt keyfuncs to below</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">keys</span> <span class="o">=</span> <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">keys</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">keys</span> <span class="o">=</span> <span class="n">keys</span>
+
+        <span class="k">with</span> <span class="n">cassandra_session</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">contact_points</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">ks_meta</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">cluster</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">keyspaces</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">keyspace</span><span class="p">]</span>
+            <span class="n">tbl_metas</span> <span class="o">=</span> <span class="p">[</span><span class="n">ks_meta</span><span class="o">.</span><span class="n">tables</span><span class="p">[</span><span class="n">scan</span><span class="o">.</span><span class="n">table</span><span class="p">]</span> <span class="k">for</span> <span class="n">scan</span> <span class="ow">in</span> <span class="n">scans</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">keys</span><span class="p">:</span>
+                <span class="n">primary_key_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">tbl_metas</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">primary_key</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">tbl_meta</span> <span class="ow">in</span> <span class="n">tbl_metas</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">tbl_meta</span><span class="o">.</span><span class="n">primary_key</span><span class="p">)</span> <span class="o">==</span> <span class="n">primary_key_length</span><span class="p">,</span> \
+                        <span class="s2">&quot;can&#39;t co-scan without keys with varying primary key length&quot;</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">keyfuncs</span> <span class="o">=</span> <span class="p">[</span><span class="n">partial</span><span class="p">(</span><span class="n">take</span><span class="p">,</span> <span class="n">primary_key_length</span><span class="p">)]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">grouptransforms</span> <span class="o">=</span> <span class="p">[</span><span class="n">partial</span><span class="p">(</span><span class="n">get_or_none</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">scans</span><span class="p">),</span> \
+                    <span class="s2">&quot;provide a key for each table scanned or none at all&quot;</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">keyfuncs</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">grouptransforms</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">scan</span><span class="p">,</span> <span class="n">tbl_meta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">scans</span><span class="p">,</span> <span class="n">tbl_metas</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                        <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">key</span><span class="p">,)</span>
+                    <span class="n">keylen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+                    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">tbl_meta</span><span class="o">.</span><span class="n">partition_key</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">keylen</span><span class="p">,</span> \
+                        <span class="s2">&quot;can&#39;t co-scan over a table keyed by part of the partition key&quot;</span>
+                    <span class="k">assert</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">tbl_meta</span><span class="o">.</span><span class="n">primary_key</span><span class="p">)[:</span><span class="n">keylen</span><span class="p">],</span> \
+                        <span class="s2">&quot;the key columns must be the first part (or all) of the primary key&quot;</span>
+                    <span class="k">assert</span> <span class="n">scan</span><span class="o">.</span><span class="n">_select</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">scan</span><span class="o">.</span><span class="n">_select</span><span class="p">)[:</span><span class="n">keylen</span><span class="p">],</span> \
+                        <span class="s2">&quot;select all columns or the primary key columns in the order as they &quot;</span> \
+                        <span class="s2">&quot;are defined in the CQL schema&quot;</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="n">keyfuncs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">take</span><span class="p">,</span> <span class="n">keylen</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">keylen</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">tbl_meta</span><span class="o">.</span><span class="n">primary_key</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">grouptransforms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">get_or_none</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">grouptransforms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">identity</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="CassandraCoScanDataset.coscan"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanDataset.coscan">[docs]</a>    <span class="k">def</span> <span class="nf">coscan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">others</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">CassandraCoScanDataset</span><span class="p">(</span><span class="o">*</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="p">)</span> <span class="o">+</span> <span class="n">others</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="n">keys</span><span class="p">)</span></div>
+
+
+    <span class="nd">@lru_cache</span><span class="p">()</span>
+<div class="viewcode-block" id="CassandraCoScanDataset.parts"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanDataset.parts">[docs]</a>    <span class="k">def</span> <span class="nf">parts</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">bndl_cassandra.dataset</span> <span class="k">import</span> <span class="n">CassandraScanPartition</span>
+
+        <span class="k">with</span> <span class="n">cassandra_session</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">contact_points</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">size_estimates</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">((</span><span class="n">estimate_size</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">table</span><span class="p">)</span> <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="p">),</span>
+                                 <span class="n">SizeEstimate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+        <span class="n">partitions</span> <span class="o">=</span> <span class="n">partitioner</span><span class="o">.</span><span class="n">partition_ranges</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">contact_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">size_estimates</span><span class="o">=</span><span class="n">size_estimates</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="n">CassandraCoScanPartition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="p">[</span><span class="n">CassandraScanPartition</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="o">*</span><span class="n">part</span><span class="p">)</span>
+                                                     <span class="k">for</span> <span class="n">scan</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">part</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">partitions</span><span class="p">)</span>
+        <span class="p">]</span></div></div>
+
+
+<div class="viewcode-block" id="CassandraCoScanPartition"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanPartition">[docs]</a><span class="k">class</span> <span class="nc">CassandraCoScanPartition</span><span class="p">(</span><span class="n">Partition</span><span class="p">):</span>
+<div class="viewcode-block" id="CassandraCoScanPartition.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.coscan.CassandraCoScanPartition.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dset</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">scans</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">dset</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scans</span> <span class="o">=</span> <span class="n">scans</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_locality</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workers</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scans</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_locality</span><span class="p">(</span><span class="n">workers</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">_compute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">keyfuncs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">keyfuncs</span>
+        <span class="n">grouptransforms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">grouptransforms</span>
+
+        <span class="n">subscans</span> <span class="o">=</span> <span class="p">[</span><span class="n">scan</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span> <span class="k">for</span> <span class="n">scan</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">scans</span><span class="p">]</span>
+        <span class="n">merged</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">cidx</span><span class="p">,</span> <span class="n">scan</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subscans</span><span class="p">):</span>
+            <span class="n">keyf</span> <span class="o">=</span> <span class="n">keyfuncs</span><span class="p">[</span><span class="n">cidx</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">scan</span><span class="p">:</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">keyf</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+                <span class="n">batch</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">batch</span><span class="p">:</span>
+                    <span class="n">merged</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">subscans</span><span class="p">]</span>
+                <span class="n">batch</span><span class="p">[</span><span class="n">cidx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">groups</span> <span class="ow">in</span> <span class="n">merged</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">transform</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">grouptransforms</span><span class="p">)):</span>
+                <span class="n">groups</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">key</span><span class="p">,</span> <span class="n">groups</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; <a href="../../copyright.html">Copyright</a> 2016, Frens Jan Rumph.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.5.4',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

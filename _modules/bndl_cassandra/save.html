@@ -1,0 +1,504 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>bndl_cassandra.save &mdash; bndl-cassandra 0.5.4 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+        <link rel="copyright" title="Copyright" href="../../copyright.html"/>
+    <link rel="top" title="bndl-cassandra 0.5.4 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> bndl-cassandra
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compatibility.html">Compatibility</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../issues.html">Known issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">bndl-cassandra</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>bndl_cassandra.save</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for bndl_cassandra.save</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">threading</span> <span class="k">import</span> <span class="n">Condition</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">bndl.util.retry</span> <span class="k">import</span> <span class="n">retry_delay</span>
+<span class="kn">from</span> <span class="nn">bndl.util.timestamps</span> <span class="k">import</span> <span class="n">ms_timestamp</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra.session</span> <span class="k">import</span> <span class="n">cassandra_session</span><span class="p">,</span> <span class="n">TRANSIENT_ERRORS</span>
+<span class="kn">from</span> <span class="nn">cassandra.query</span> <span class="k">import</span> <span class="n">BatchStatement</span><span class="p">,</span> <span class="n">BatchType</span><span class="p">,</span> <span class="n">BoundStatement</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+
+<span class="n">INSERT_TEMPLATE</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s1">&#39;insert into </span><span class="si">{keyspace}</span><span class="s1">.</span><span class="si">{table}</span><span class="s1"> &#39;</span>
+    <span class="s1">&#39;(</span><span class="si">{columns}</span><span class="s1">) values (</span><span class="si">{placeholders}</span><span class="s1">)&#39;</span>
+    <span class="s1">&#39;</span><span class="si">{using}</span><span class="s1">&#39;</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="batch_statements"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.save.batch_statements">[docs]</a><span class="k">def</span> <span class="nf">batch_statements</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">buffer_size</span><span class="p">,</span> <span class="n">statements</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">bndl_cassandra</span> <span class="k">import</span> <span class="n">BatchKey</span>
+    <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="n">BatchKey</span><span class="o">.</span><span class="n">none</span> <span class="ow">or</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">yield from</span> <span class="n">statements</span>
+        <span class="k">return</span>
+    <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="n">BatchKey</span><span class="o">.</span><span class="n">replica_set</span><span class="p">:</span>
+        <span class="n">get_replicas</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">cluster</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get_replicas</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">stmt</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">replica</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">replica</span> <span class="ow">in</span> <span class="n">get_replicas</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">stmt</span><span class="o">.</span><span class="n">routing_key</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">stmt</span><span class="p">:</span> <span class="n">stmt</span><span class="o">.</span><span class="n">routing_key</span>
+
+    <span class="n">statements</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">statements</span><span class="p">)</span>
+
+    <span class="n">by_key</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">create_batch_statement</span><span class="p">(</span><span class="n">statements</span><span class="p">):</span>
+        <span class="n">first</span> <span class="o">=</span> <span class="n">statements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="n">BatchStatement</span><span class="p">(</span><span class="n">BatchType</span><span class="o">.</span><span class="n">UNLOGGED</span><span class="p">,</span> <span class="n">first</span><span class="o">.</span><span class="n">retry_policy</span><span class="p">,</span>
+                            <span class="n">first</span><span class="o">.</span><span class="n">consistency_level</span><span class="p">,</span>
+                            <span class="n">first</span><span class="o">.</span><span class="n">serial_consistency_level</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">statements</span><span class="p">:</span>
+            <span class="n">batch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">batch</span>
+
+    <span class="k">def</span> <span class="nf">create_batch</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="n">BatchStatement</span><span class="p">(</span><span class="n">BatchType</span><span class="o">.</span><span class="n">UNLOGGED</span><span class="p">,</span>
+                       <span class="n">stmt</span><span class="o">.</span><span class="n">retry_policy</span><span class="p">,</span>
+                       <span class="n">stmt</span><span class="o">.</span><span class="n">consistency_level</span><span class="p">,</span>
+                       <span class="n">stmt</span><span class="o">.</span><span class="n">serial_consistency_level</span><span class="p">)</span>
+        <span class="n">by_key</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch</span>
+        <span class="c1"># The Java driver has the option to request the encoded size, the</span>
+        <span class="c1"># python driver doesn&#39;t, this is an approximation of the size based</span>
+        <span class="c1"># on the v4 Cassandra protocol</span>
+        <span class="c1"># batch type is a byte, no queries is 2 bytes, consistency level is a</span>
+        <span class="c1"># short (2 bytes), flags is a byte, timestamp is 8 bytes</span>
+        <span class="c1"># adding 6 bytes margin makes 20</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="mi">20</span>
+        <span class="k">return</span> <span class="n">batch</span>
+
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">stmt</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">statements</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">by_key</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">k</span> <span class="o">=</span> <span class="n">key</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="n">by_key</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="c1"># The Java driver has the option to request the encoded size, the</span>
+            <span class="c1"># python driver doesn&#39;t, this is an approximation of the size based</span>
+            <span class="c1"># on the v4 Cassandra protocol</span>
+            <span class="c1"># no params is 2 bytes, statement type is a byte</span>
+            <span class="c1"># add some 5 bytes margin makes 8</span>
+            <span class="c1"># each value is prepended by an int</span>
+            <span class="n">stmt_size</span> <span class="o">=</span> <span class="mi">8</span> <span class="o">+</span> <span class="mi">4</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">values</span><span class="p">)</span> <span class="o">+</span> \
+                        <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">stmt</span><span class="o">.</span><span class="n">values</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">==</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">BoundStatement</span><span class="p">):</span>
+                <span class="c1"># query strings are prepended by a long</span>
+                <span class="n">stmt_size</span> <span class="o">+=</span> <span class="mi">8</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">prepared_statement</span><span class="o">.</span><span class="n">query_id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># query ids are prepended by a short</span>
+                <span class="n">stmt_size</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">query_string</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">batch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">batch</span> <span class="o">=</span> <span class="n">create_batch</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">batch</span><span class="o">.</span><span class="n">size</span> <span class="o">+</span> <span class="n">stmt_size</span> <span class="o">&gt;</span> <span class="n">batch_size</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">batch</span>
+                <span class="n">batch</span> <span class="o">=</span> <span class="n">create_batch</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">batch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+            <span class="n">batch</span><span class="o">.</span><span class="n">size</span> <span class="o">+=</span> <span class="n">stmt_size</span></div>
+
+
+<div class="viewcode-block" id="execute_save"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.save.execute_save">[docs]</a><span class="k">def</span> <span class="nf">execute_save</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="n">keyspace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Save elements from an iterable given the insert/update query. Use</span>
+<span class="sd">    cassandra_save to save a dataset. This method is useful when saving</span>
+<span class="sd">    to multiple tables from a single dataset with map_partitions.</span>
+
+<span class="sd">    :param ctx: bndl.compute.context.ComputeContext</span>
+<span class="sd">        The BNDL compute context to use for configuration and accessing the</span>
+<span class="sd">        cassandra_session.</span>
+<span class="sd">    :param statement: str</span>
+<span class="sd">        The Cassandra statement to use in saving the iterable.</span>
+<span class="sd">    :param iterable: list, tuple, generator, iterable, ...</span>
+<span class="sd">        The values to save.</span>
+<span class="sd">    :param keyspace: str or None</span>
+<span class="sd">        The keyspace to execute the save in (if the statements don&#39;t have an</span>
+<span class="sd">        explicit keyspace). keyspace is supplied to ctx.cassandra_session which</span>
+<span class="sd">        defaults to using the &#39;bndl_cassandra.keyspace&#39; setting as default value.</span>
+<span class="sd">    :param contact_points: str, tuple, or list</span>
+<span class="sd">        A string or tuple/list of strings denoting host names (contact points)</span>
+<span class="sd">        of the Cassandra cluster to save to. Defaults to using the ip addresses</span>
+<span class="sd">        in the BNDL cluster.</span>
+<span class="sd">    :return: A count of the records saved.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">consistency_level</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_consistency_level&#39;</span><span class="p">)</span>
+    <span class="n">timeout</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_timeout&#39;</span><span class="p">)</span>
+    <span class="n">retry_count</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_retry_count&#39;</span><span class="p">)</span>
+    <span class="n">retry_backoff</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_retry_backoff&#39;</span><span class="p">)</span>
+    <span class="n">concurrency</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_concurrency&#39;</span><span class="p">))</span>
+
+    <span class="n">batch_key</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_batch_key&#39;</span><span class="p">)</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_batch_size&#39;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1024</span>
+    <span class="n">batch_buffer_size</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.write_batch_buffer_size&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;executing cassandra save with statement </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+    <span class="k">with</span> <span class="n">cassandra_session</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">keyspace</span><span class="o">=</span><span class="n">keyspace</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+        <span class="n">prepared_statement</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
+        <span class="n">prepared_statement</span><span class="o">.</span><span class="n">consistency_level</span> <span class="o">=</span> <span class="n">consistency_level</span>
+
+        <span class="c1"># bind each element in iterable to the prepared statement</span>
+        <span class="n">statements</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">prepared_statement</span><span class="o">.</span><span class="n">bind</span><span class="p">,</span> <span class="n">iterable</span><span class="p">)</span>
+        <span class="c1"># batching statements as configured</span>
+        <span class="n">statements</span> <span class="o">=</span> <span class="n">batch_statements</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">batch_key</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span>
+                                      <span class="n">batch_buffer_size</span><span class="p">,</span> <span class="n">statements</span><span class="p">)</span>
+
+        <span class="n">saved</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">pending</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">Condition</span><span class="p">()</span>
+
+        <span class="n">failure</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">failcounts</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">on_done</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
+            <span class="k">nonlocal</span> <span class="n">saved</span><span class="p">,</span> <span class="n">pending</span><span class="p">,</span> <span class="n">cond</span>
+            <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">BatchStatement</span><span class="p">):</span>
+                    <span class="n">saved</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">statement</span><span class="o">.</span><span class="n">_statements_and_parameters</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">saved</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">pending</span> <span class="o">-=</span> <span class="mi">1</span>
+                <span class="n">cond</span><span class="o">.</span><span class="n">notify_all</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">on_failed</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
+            <span class="k">nonlocal</span> <span class="n">failcounts</span><span class="p">,</span> <span class="n">session</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span> <span class="ow">in</span> <span class="n">TRANSIENT_ERRORS</span> <span class="ow">and</span> <span class="n">failcounts</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">retry_count</span><span class="p">:</span>
+                <span class="n">failcounts</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">retry_backoff</span><span class="p">:</span>
+                    <span class="n">sleep</span> <span class="o">=</span> <span class="n">retry_delay</span><span class="p">(</span><span class="n">retry_backoff</span><span class="p">,</span> <span class="n">failcounts</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;query failed with </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1"> in total for this query, backing off with sleep of </span><span class="si">%s</span><span class="s1">s&#39;</span><span class="p">,</span>
+                                     <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">__name__</span><span class="p">,</span> <span class="n">failcounts</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">sleep</span><span class="p">)</span>
+                    <span class="n">session</span><span class="o">.</span><span class="n">cluster</span><span class="o">.</span><span class="n">scheduler</span><span class="o">.</span><span class="n">schedule</span><span class="p">(</span><span class="n">sleep</span><span class="p">,</span> <span class="n">partial</span><span class="p">(</span><span class="n">exec_async</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">exec_async</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">nonlocal</span> <span class="n">failure</span><span class="p">,</span> <span class="n">pending</span><span class="p">,</span> <span class="n">cond</span>
+                <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
+                    <span class="n">failure</span> <span class="o">=</span> <span class="n">exc</span>
+                    <span class="n">pending</span> <span class="o">-=</span> <span class="mi">1</span>
+                    <span class="n">cond</span><span class="o">.</span><span class="n">notify_all</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">exec_async</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
+            <span class="k">nonlocal</span> <span class="n">session</span>
+            <span class="n">future</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">execute_async</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+            <span class="n">future</span><span class="o">.</span><span class="n">add_callback</span><span class="p">(</span><span class="n">on_done</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+            <span class="n">future</span><span class="o">.</span><span class="n">add_errback</span><span class="p">(</span><span class="n">on_failed</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">statement</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">statements</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
+                <span class="n">cond</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pending</span> <span class="o">&lt;</span> <span class="n">concurrency</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">failure</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">failure</span>
+                <span class="n">pending</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">exec_async</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">failure</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">failure</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;all queries issued, waiting for completion&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
+            <span class="n">cond</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pending</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">failure</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">failure</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">saved</span><span class="p">,)</span></div>
+
+
+<div class="viewcode-block" id="cassandra_execute"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.save.cassandra_execute">[docs]</a><span class="k">def</span> <span class="nf">cassandra_execute</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="n">keyspace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Execute a CQL statement per element in the dataset.</span>
+
+<span class="sd">    :param dataset: bndl.compute.context.ComputationContext</span>
+<span class="sd">        As the cassandra_save function is typically bound on ComputationContext</span>
+<span class="sd">        this corresponds to self.</span>
+<span class="sd">    :param statement: str</span>
+<span class="sd">        The CQL statement to execute.</span>
+<span class="sd">    :param keyspace: str</span>
+<span class="sd">        The name of the Cassandra keyspace to save to.</span>
+<span class="sd">    :param contact_points: str, tuple, or list</span>
+<span class="sd">        A string or tuple/list of strings denoting hostnames (contact points)</span>
+<span class="sd">        of the Cassandra cluster to save to. Defaults to using the ip addresses</span>
+<span class="sd">        in the BNDL cluster.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">dataset</span><span class="o">.</span><span class="n">map_partitions</span><span class="p">(</span><span class="n">execute_save</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="n">keyspace</span><span class="o">=</span><span class="n">keyspace</span><span class="p">,</span>
+                                  <span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="cassandra_save"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.save.cassandra_save">[docs]</a><span class="k">def</span> <span class="nf">cassandra_save</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">keyed_rows</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                   <span class="n">ttl</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Performs a Cassandra insert for each element of the dataset.</span>
+
+<span class="sd">    :param dataset: bndl.compute.context.ComputationContext</span>
+<span class="sd">        As the cassandra_save function is typically bound on ComputationContext</span>
+<span class="sd">        this corresponds to self.</span>
+<span class="sd">    :param keyspace: str</span>
+<span class="sd">        The name of the Cassandra keyspace to save to.</span>
+<span class="sd">    :param table:</span>
+<span class="sd">        The name of the Cassandra table (column family) to save to.</span>
+<span class="sd">    :param columns:</span>
+<span class="sd">        The names of the columns to save.</span>
+
+<span class="sd">        When the dataset contains tuples, this arguments is the mapping of the</span>
+<span class="sd">        tuple elements to the columns of the table saved to. If not provided,</span>
+<span class="sd">        all columns are used.</span>
+
+<span class="sd">        When the dataset contains dictionaries, this parameter limits the</span>
+<span class="sd">        columns save to Cassandra.</span>
+<span class="sd">    :param keyed_rows: bool</span>
+<span class="sd">        Whether to expect a dataset of dicts (or at least supports the</span>
+<span class="sd">        __getitem__ protocol with columns names as key) or positional objects</span>
+<span class="sd">        (e.g. tuples or lists).</span>
+<span class="sd">    :param ttl: int</span>
+<span class="sd">        The time to live to use in saving the records.</span>
+<span class="sd">    :param timestamp: int or datetime.date or datetime.datetime</span>
+<span class="sd">        The timestamp to use in saving the records.</span>
+<span class="sd">    :param contact_points: str, tuple, or list</span>
+<span class="sd">        A string or tuple/list of strings denoting hostnames (contact points)</span>
+<span class="sd">        of the Cassandra cluster to save to. Defaults to using the ip addresses</span>
+<span class="sd">        in the BNDL cluster.</span>
+
+<span class="sd">    Example:</span>
+
+<span class="sd">        &gt;&gt;&gt; ctx.collection([{&#39;key&#39;: 1, &#39;val&#39;: &#39;a&#39; }, {&#39;key&#39;: 2, &#39;val&#39;: &#39;b&#39; },])</span>
+<span class="sd">               .cassandra_save(&#39;keyspace&#39;, &#39;table&#39;)</span>
+<span class="sd">               .execute()</span>
+<span class="sd">        &gt;&gt;&gt; ctx.range(100)</span>
+<span class="sd">               .map(lambda i: {&#39;key&#39;: i, &#39;val&#39;: str(i) }</span>
+<span class="sd">               .cassandra_save(&#39;keyspace&#39;, &#39;table&#39;)</span>
+<span class="sd">               .sum()</span>
+<span class="sd">        100</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="n">ttl</span> <span class="ow">or</span> <span class="n">timestamp</span><span class="p">:</span>
+        <span class="n">using</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">ttl</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ttl</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">):</span>
+                <span class="n">ttl</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ttl</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+            <span class="n">using</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;ttl &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ttl</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">timestamp</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="p">(</span><span class="n">date</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)):</span>
+                <span class="n">timestamp</span> <span class="o">=</span> <span class="n">ms_timestamp</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+            <span class="n">using</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;timestamp &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">timestamp</span><span class="p">))</span>
+        <span class="n">using</span> <span class="o">=</span> <span class="s1">&#39; using &#39;</span> <span class="o">+</span> <span class="s1">&#39; and &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">using</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">using</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">columns</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">dataset</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">cassandra_session</span><span class="p">(</span><span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">table_meta</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">cluster</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">keyspaces</span><span class="p">[</span><span class="n">keyspace</span><span class="p">]</span><span class="o">.</span><span class="n">tables</span><span class="p">[</span><span class="n">table</span><span class="p">]</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">table_meta</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="n">placeholders</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="p">(</span><span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">keyed_rows</span> <span class="k">else</span>
+        <span class="p">(</span><span class="s1">&#39;?&#39;</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">)</span>
+    <span class="p">))</span>
+
+    <span class="n">insert</span> <span class="o">=</span> <span class="n">INSERT_TEMPLATE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">keyspace</span><span class="o">=</span><span class="n">keyspace</span><span class="p">,</span>
+        <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">,</span>
+        <span class="n">columns</span><span class="o">=</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">),</span>
+        <span class="n">placeholders</span><span class="o">=</span><span class="n">placeholders</span><span class="p">,</span>
+        <span class="n">using</span><span class="o">=</span><span class="n">using</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cassandra_execute</span><span class="p">(</span><span class="n">insert</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; <a href="../../copyright.html">Copyright</a> 2016, Frens Jan Rumph.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.5.4',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

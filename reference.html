@@ -1,0 +1,809 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Reference &mdash; bndl-cassandra 0.5.4 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+        <link rel="copyright" title="Copyright" href="copyright.html"/>
+    <link rel="top" title="bndl-cassandra 0.5.4 documentation" href="index.html"/>
+        <link rel="next" title="Known issues" href="issues.html"/>
+        <link rel="prev" title="Usage" href="usage.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> bndl-cassandra
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="compatibility.html">Compatibility</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="issues.html">Known issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">bndl-cassandra</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Reference</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/reference.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="reference">
+<h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-bndl_cassandra.session">
+<span id="session"></span><h2>Session<a class="headerlink" href="#module-bndl_cassandra.session" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="bndl_cassandra.session.LocalNodeFirstPolicy">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.session.</code><code class="descname">LocalNodeFirstPolicy</code><span class="sig-paren">(</span><em>child_policy</em>, <em>local_hosts</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#LocalNodeFirstPolicy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.LocalNodeFirstPolicy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">cassandra.policies.TokenAwarePolicy</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.session.LocalNodeFirstPolicy.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>child_policy</em>, <em>local_hosts</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#LocalNodeFirstPolicy.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.LocalNodeFirstPolicy.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.session.LocalNodeFirstPolicy.is_node_local">
+<code class="descname">is_node_local</code><span class="sig-paren">(</span><em>host</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#LocalNodeFirstPolicy.is_node_local"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.LocalNodeFirstPolicy.is_node_local" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.session.LocalNodeFirstPolicy.make_query_plan">
+<code class="descname">make_query_plan</code><span class="sig-paren">(</span><em>working_keyspace=None</em>, <em>query=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#LocalNodeFirstPolicy.make_query_plan"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.LocalNodeFirstPolicy.make_query_plan" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.session.LocalNodeFirstPolicy.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.session'</em><a class="headerlink" href="#bndl_cassandra.session.LocalNodeFirstPolicy.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.session.prepare">
+<code class="descclassname">bndl_cassandra.session.</code><code class="descname">prepare</code><span class="sig-paren">(</span><em>self</em>, <em>query</em>, <em>custom_payload=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#prepare"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.prepare" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.session.get_contact_points">
+<code class="descclassname">bndl_cassandra.session.</code><code class="descname">get_contact_points</code><span class="sig-paren">(</span><em>ctx</em>, <em>contact_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#get_contact_points"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.get_contact_points" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.session.cassandra_session">
+<code class="descclassname">bndl_cassandra.session.</code><code class="descname">cassandra_session</code><span class="sig-paren">(</span><em>ctx</em>, <em>keyspace=None</em>, <em>contact_points=None</em>, <em>row_factory=None</em>, <em>client_protocol_handler=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/session.html#cassandra_session"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.session.cassandra_session" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="module-bndl_cassandra.partitioner">
+<span id="partitioner"></span><h2>Partitioner<a class="headerlink" href="#module-bndl_cassandra.partitioner" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bndl_cassandra.partitioner.get_token_ranges">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">get_token_ranges</code><span class="sig-paren">(</span><em>ring</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#get_token_ranges"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.get_token_ranges" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.partitioner.replicas_for_token">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">replicas_for_token</code><span class="sig-paren">(</span><em>keyspace</em>, <em>token_map</em>, <em>token</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#replicas_for_token"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.replicas_for_token" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.partitioner.ranges_by_replicas">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">ranges_by_replicas</code><span class="sig-paren">(</span><em>session</em>, <em>keyspace</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#ranges_by_replicas"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.ranges_by_replicas" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.partitioner.Bin">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">Bin</code><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#Bin"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.Bin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.Bin.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#Bin.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.Bin.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.Bin.__dict__">
+<code class="descname">__dict__</code><em class="property"> = mappingproxy({'__dict__': &lt;attribute '__dict__' of 'Bin' objects&gt;, '__init__': &lt;function Bin.__init__&gt;, '__module__': 'bndl_cassandra.partitioner', '__weakref__': &lt;attribute '__weakref__' of 'Bin' objects&gt;, '__doc__': None})</em><a class="headerlink" href="#bndl_cassandra.partitioner.Bin.__dict__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.Bin.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.partitioner'</em><a class="headerlink" href="#bndl_cassandra.partitioner.Bin.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.Bin.__weakref__">
+<code class="descname">__weakref__</code><a class="headerlink" href="#bndl_cassandra.partitioner.Bin.__weakref__" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of weak references to the object (if defined)</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.partitioner.partition_ranges_">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">partition_ranges_</code><span class="sig-paren">(</span><em>ranges</em>, <em>max_length</em>, <em>size_estimate</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#partition_ranges_"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.partition_ranges_" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.partition_ranges">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">partition_ranges</code><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#partition_ranges"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.partition_ranges" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.partitioner.SizeEstimate">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">SizeEstimate</code><span class="sig-paren">(</span><em>size</em>, <em>partitions</em>, <em>fraction</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>size</em>, <em>partitions</em>, <em>fraction</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__add__">
+<code class="descname">__add__</code><span class="sig-paren">(</span><em>other</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__add__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__add__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__iadd__">
+<code class="descname">__iadd__</code><span class="sig-paren">(</span><em>other</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__iadd__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__iadd__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__dict__">
+<code class="descname">__dict__</code><em class="property"> = mappingproxy({'__init__': &lt;function SizeEstimate.__init__&gt;, '__add__': &lt;function SizeEstimate.__add__&gt;, '__repr__': &lt;function SizeEstimate.__repr__&gt;, '__dict__': &lt;attribute '__dict__' of 'SizeEstimate' objects&gt;, '__module__': 'bndl_cassandra.partitioner', '__doc__': None, '__iadd__': &lt;function SizeEstimate.__iadd__&gt;, '__hash__': &lt;function SizeEstimate.__hash__&gt;, '__eq__': &lt;function SizeEstimate.__eq__&gt;, '__weakref__': &lt;attribute '__weakref__' of 'SizeEstimate' objects&gt;})</em><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__dict__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__hash__">
+<code class="descname">__hash__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__hash__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__hash__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.partitioner'</em><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__weakref__">
+<code class="descname">__weakref__</code><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__weakref__" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of weak references to the object (if defined)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__eq__">
+<code class="descname">__eq__</code><span class="sig-paren">(</span><em>other</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__eq__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__eq__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.partitioner.SizeEstimate.__repr__">
+<code class="descname">__repr__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#SizeEstimate.__repr__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.SizeEstimate.__repr__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.partitioner.estimate_size">
+<code class="descclassname">bndl_cassandra.partitioner.</code><code class="descname">estimate_size</code><span class="sig-paren">(</span><em>session</em>, <em>keyspace</em>, <em>table</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/partitioner.html#estimate_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.partitioner.estimate_size" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<span class="target" id="module-bndl_cassandra.repartition"></span></div>
+<div class="section" id="module-bndl_cassandra.dataset">
+<span id="dataset"></span><h2>Dataset<a class="headerlink" href="#module-bndl_cassandra.dataset" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bndl_cassandra.dataset.get_table_meta">
+<code class="descclassname">bndl_cassandra.dataset.</code><code class="descname">get_table_meta</code><span class="sig-paren">(</span><em>session</em>, <em>keyspace</em>, <em>table</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#get_table_meta"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.get_table_meta" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.dataset.</code><code class="descname">CassandraScanDataset</code><span class="sig-paren">(</span><em>ctx</em>, <em>keyspace</em>, <em>table</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl_cassandra.dataset._CassandraDataset</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>ctx</em>, <em>keyspace</em>, <em>table</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a scan across keyspace.table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ctx</strong> &#8211; The compute context.</li>
+<li><strong>keyspace</strong> &#8211; str
+Keyspace of the table to scan.</li>
+<li><strong>table</strong> &#8211; str
+Name of the table to scan.</li>
+<li><strong>contact_points</strong> &#8211; None or str or [str,str,str,...]
+None to use the default contact points or a list of contact points
+or a comma separated string of contact points.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.where">
+<code class="descname">where</code><span class="sig-paren">(</span><em>clause</em>, <em>*values</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.where"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.where" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.count">
+<code class="descname">count</code><span class="sig-paren">(</span><em>push_down=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.count"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.count" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.as_dataframe">
+<code class="descname">as_dataframe</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.as_dataframe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.as_dataframe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a bndl.compute.dataframe.DistributedDataFrame out of a Cassandra
+table scan.</p>
+<p>When primary key fields are selected, they are used to compose a
+(multilevel) index.</p>
+<p>Example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">cassandra_table</span><span class="p">(</span><span class="s1">&#39;ks&#39;</span><span class="p">,</span> <span class="s1">&#39;tbl&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">as_dataframe</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+<span class="go">                                     comments</span>
+<span class="go">id          timestamp</span>
+<span class="go">ZIJr6BDGCeo 2014-10-09 19:28:43.657         1</span>
+<span class="go">            2015-01-12 20:24:49.947         4</span>
+<span class="go">            2015-01-13 02:24:30.931         39</span>
+<span class="go">kxcT9VOI0oU 2015-01-12 14:24:16.378         1</span>
+<span class="go">            2015-01-12 20:24:49.947         5</span>
+<span class="go">            2015-01-13 02:24:30.931         8</span>
+<span class="go">            2015-02-04 10:29:58.118         4</span>
+<span class="go">A_egyclRPOw 2015-12-16 13:50:53.210         1</span>
+<span class="go">            2015-01-18 18:28:19.556         2</span>
+<span class="go">            2015-01-22 22:28:33.358         4</span>
+<span class="go">            2015-01-27 02:28:59.578         6</span>
+<span class="go">            2015-01-31 06:29:07.937         7</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.span_by">
+<code class="descname">span_by</code><span class="sig-paren">(</span><em>*cols</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.span_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.span_by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Span by groups rows in a Cassandra table scan by a subset of the
+primary key.</p>
+<p>This is useful for tables with clustering columns: rows in a
+cassandra table scan are returned clustered by partition key
+and sorted by clustering columns. This is exploited to efficiently
+(without shuffle) group rows by a part of the primary key.</p>
+<p>Example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">cassandra_table</span><span class="p">(</span><span class="s1">&#39;ks&#39;</span><span class="p">,</span> <span class="s1">&#39;tbl&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">span_by</span><span class="p">()</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+<span class="go">[(&#39;ZIJr6BDGCeo&#39;,                       comments</span>
+<span class="go">  id          timestamp</span>
+<span class="go">  ZIJr6BDGCeo 2014-10-09 19:28:43.657         1</span>
+<span class="go">              2015-01-12 20:24:49.947         4</span>
+<span class="go">              2015-01-13 02:24:30.931         9),</span>
+<span class="go"> (&#39;kxcT9VOI0oU&#39;,                       comments</span>
+<span class="go">  id          timestamp</span>
+<span class="go">  kxcT9VOI0oU 2015-01-12 14:24:16.378         1</span>
+<span class="go">              2015-01-12 20:24:49.947         2</span>
+<span class="go">              2015-01-13 02:24:30.931         5</span>
+<span class="go">              2015-02-04 10:29:58.118         8),</span>
+<span class="go"> (&#39;A_egyclRPOw&#39;,                       comments</span>
+<span class="go">  id          timestamp</span>
+<span class="go">  A_egyclRPOw 2015-12-16 13:50:53.210         1</span>
+<span class="go">              2015-01-18 18:28:19.556         2</span>
+<span class="go">              2015-01-22 22:28:33.358         4</span>
+<span class="go">              2015-01-27 02:28:59.578         6</span>
+<span class="go">              2015-01-31 06:29:07.937         7)]</span>
+</pre></div>
+</div>
+<p>A Cassandra table scan spanned by part of the primary key consists of
+pandas.DataFrame objects, and thus allows for easy per group analysis.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">tbl</span><span class="o">.</span><span class="n">span_by</span><span class="p">()</span><span class="o">.</span><span class="n">map_values</span><span class="p">(</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="o">.</span><span class="n">count</span><span class="p">())</span><span class="o">.</span><span class="n">collect</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="go">ZIJr6BDGCeo : comments    3</span>
+<span class="go">dtype: int64</span>
+<span class="go">kxcT9VOI0oU : comments    4</span>
+<span class="go">dtype: int64</span>
+<span class="go">A_egyclRPOw : comments    5</span>
+<span class="go">dtype: int64</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.itake">
+<code class="descname">itake</code><span class="sig-paren">(</span><em>num</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.itake"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.itake" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.coscan">
+<code class="descname">coscan</code><span class="sig-paren">(</span><em>*scans</em>, <em>keys=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.coscan"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.coscan" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.parts">
+<code class="descname">parts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanDataset.parts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.parts" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.dataset.CassandraScanDataset.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.dataset'</em><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanDataset.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.dataset.CassandraScanPartition">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.dataset.</code><code class="descname">CassandraScanPartition</code><span class="sig-paren">(</span><em>dset</em>, <em>part_idx</em>, <em>replicas</em>, <em>token_ranges</em>, <em>size_estimate_mb</em>, <em>size_estimate_keys</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanPartition"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanPartition" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl.compute.dataset.Partition</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.dataset.CassandraScanPartition.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>dset</em>, <em>part_idx</em>, <em>replicas</em>, <em>token_ranges</em>, <em>size_estimate_mb</em>, <em>size_estimate_keys</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/dataset.html#CassandraScanPartition.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanPartition.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.dataset.CassandraScanPartition.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.dataset'</em><a class="headerlink" href="#bndl_cassandra.dataset.CassandraScanPartition.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-bndl_cassandra.coscan">
+<span id="coscan"></span><h2>CoScan<a class="headerlink" href="#module-bndl_cassandra.coscan" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bndl_cassandra.coscan.get_or_none">
+<code class="descclassname">bndl_cassandra.coscan.</code><code class="descname">get_or_none</code><span class="sig-paren">(</span><em>index</em>, <em>container</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#get_or_none"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.get_or_none" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.coscan.CassandraCoScanDataset">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.coscan.</code><code class="descname">CassandraCoScanDataset</code><span class="sig-paren">(</span><em>*scans</em>, <em>keys=None</em>, <em>dset_id=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanDataset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl.compute.dataset.Dataset</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.coscan.CassandraCoScanDataset.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*scans</em>, <em>keys=None</em>, <em>dset_id=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanDataset.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanDataset.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.coscan.CassandraCoScanDataset.coscan">
+<code class="descname">coscan</code><span class="sig-paren">(</span><em>*others</em>, <em>keys=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanDataset.coscan"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanDataset.coscan" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.coscan.CassandraCoScanDataset.parts">
+<code class="descname">parts</code><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanDataset.parts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanDataset.parts" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.coscan.CassandraCoScanDataset.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.coscan'</em><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanDataset.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.coscan.CassandraCoScanPartition">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.coscan.</code><code class="descname">CassandraCoScanPartition</code><span class="sig-paren">(</span><em>dset</em>, <em>idx</em>, <em>scans</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanPartition"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanPartition" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl.compute.dataset.Partition</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.coscan.CassandraCoScanPartition.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>dset</em>, <em>idx</em>, <em>scans</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/coscan.html#CassandraCoScanPartition.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanPartition.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.coscan.CassandraCoScanPartition.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.coscan'</em><a class="headerlink" href="#bndl_cassandra.coscan.CassandraCoScanPartition.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-bndl_cassandra.join">
+<span id="join"></span><h2>Join<a class="headerlink" href="#module-bndl_cassandra.join" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="bndl_cassandra.join.CassandraJoinDataset">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.join.</code><code class="descname">CassandraJoinDataset</code><span class="sig-paren">(</span><em>src</em>, <em>keyspace</em>, <em>table</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl_cassandra.dataset._CassandraDataset</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>src</em>, <em>keyspace</em>, <em>table</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.on">
+<code class="descname">on</code><span class="sig-paren">(</span><em>columns=None</em>, <em>key=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset.on"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.on" title="Permalink to this definition">¶</a></dt>
+<dd><p>Join on particular columns (from the primary key in the Cassandra
+table) and set a key to select the corresponding values from the
+dataset to join.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>columns</strong> &#8211; sequence[str], optional
+The columns to join on. Must be a left subset of the primary key.
+The following must hold: primary_key[:len(columns)] == columns.
+When the full primary key is selected, the rows yielded will be
+single elements (a dict or namedtuple representing the selected
+row). When only part of the primary key is selected (the
+partition key columns and perhaps some clustering columns), a list
+of selected rows is yielded.</li>
+<li><strong>key</strong> &#8211; <p>callable(element), list[object] or object, optional
+The key for getting the values to query Cassandra with. Must be a
+* callable which returns a sequence for each element in this</p>
+<blockquote>
+<div>dataset with the values to use in the join.</div></blockquote>
+<ul>
+<li>or a list of objects to be used as index in each element
+in a toolz.getter(columns) fashion (i.e. using the
+__getitem__ protocol)</li>
+<li>or a plain value to be used with the __getitem__ mechanism</li>
+</ul>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.inner">
+<code class="descname">inner</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset.inner"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.inner" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield only rows which have a corresponding row in the Cassandra table.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.left">
+<code class="descname">left</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset.left"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.left" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield rows regardless of whether a row was selected from Cassandra.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.parts">
+<code class="descname">parts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinDataset.parts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.parts" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.join.CassandraJoinDataset.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.join'</em><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinDataset.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="bndl_cassandra.join.CassandraJoinPartition">
+<em class="property">class </em><code class="descclassname">bndl_cassandra.join.</code><code class="descname">CassandraJoinPartition</code><span class="sig-paren">(</span><em>dset</em>, <em>src</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinPartition"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinPartition" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">bndl.compute.dataset.Partition</span></code></p>
+<dl class="method">
+<dt id="bndl_cassandra.join.CassandraJoinPartition.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>dset</em>, <em>src</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/join.html#CassandraJoinPartition.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinPartition.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="bndl_cassandra.join.CassandraJoinPartition.__module__">
+<code class="descname">__module__</code><em class="property"> = 'bndl_cassandra.join'</em><a class="headerlink" href="#bndl_cassandra.join.CassandraJoinPartition.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-bndl_cassandra.save">
+<span id="save"></span><h2>Save<a class="headerlink" href="#module-bndl_cassandra.save" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bndl_cassandra.save.batch_statements">
+<code class="descclassname">bndl_cassandra.save.</code><code class="descname">batch_statements</code><span class="sig-paren">(</span><em>session</em>, <em>key</em>, <em>batch_size</em>, <em>buffer_size</em>, <em>statements</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/save.html#batch_statements"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.save.batch_statements" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.save.execute_save">
+<code class="descclassname">bndl_cassandra.save.</code><code class="descname">execute_save</code><span class="sig-paren">(</span><em>ctx</em>, <em>statement</em>, <em>iterable</em>, <em>keyspace=None</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/save.html#execute_save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.save.execute_save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save elements from an iterable given the insert/update query. Use
+cassandra_save to save a dataset. This method is useful when saving
+to multiple tables from a single dataset with map_partitions.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>ctx</strong> &#8211; bndl.compute.context.ComputeContext
+The BNDL compute context to use for configuration and accessing the
+cassandra_session.</li>
+<li><strong>statement</strong> &#8211; str
+The Cassandra statement to use in saving the iterable.</li>
+<li><strong>iterable</strong> &#8211; list, tuple, generator, iterable, ...
+The values to save.</li>
+<li><strong>keyspace</strong> &#8211; str or None
+The keyspace to execute the save in (if the statements don&#8217;t have an
+explicit keyspace). keyspace is supplied to ctx.cassandra_session which
+defaults to using the &#8216;bndl_cassandra.keyspace&#8217; setting as default value.</li>
+<li><strong>contact_points</strong> &#8211; str, tuple, or list
+A string or tuple/list of strings denoting host names (contact points)
+of the Cassandra cluster to save to. Defaults to using the ip addresses
+in the BNDL cluster.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">A count of the records saved.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.save.cassandra_execute">
+<code class="descclassname">bndl_cassandra.save.</code><code class="descname">cassandra_execute</code><span class="sig-paren">(</span><em>dataset</em>, <em>statement</em>, <em>keyspace=None</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/save.html#cassandra_execute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.save.cassandra_execute" title="Permalink to this definition">¶</a></dt>
+<dd><p>Execute a CQL statement per element in the dataset.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>dataset</strong> &#8211; bndl.compute.context.ComputationContext
+As the cassandra_save function is typically bound on ComputationContext
+this corresponds to self.</li>
+<li><strong>statement</strong> &#8211; str
+The CQL statement to execute.</li>
+<li><strong>keyspace</strong> &#8211; str
+The name of the Cassandra keyspace to save to.</li>
+<li><strong>contact_points</strong> &#8211; str, tuple, or list
+A string or tuple/list of strings denoting hostnames (contact points)
+of the Cassandra cluster to save to. Defaults to using the ip addresses
+in the BNDL cluster.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.save.cassandra_save">
+<code class="descclassname">bndl_cassandra.save.</code><code class="descname">cassandra_save</code><span class="sig-paren">(</span><em>dataset</em>, <em>keyspace</em>, <em>table</em>, <em>columns=None</em>, <em>keyed_rows=True</em>, <em>ttl=None</em>, <em>timestamp=None</em>, <em>contact_points=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/save.html#cassandra_save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.save.cassandra_save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a Cassandra insert for each element of the dataset.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>dataset</strong> &#8211; bndl.compute.context.ComputationContext
+As the cassandra_save function is typically bound on ComputationContext
+this corresponds to self.</li>
+<li><strong>keyspace</strong> &#8211; str
+The name of the Cassandra keyspace to save to.</li>
+<li><strong>table</strong> &#8211; The name of the Cassandra table (column family) to save to.</li>
+<li><strong>columns</strong> &#8211; <p>The names of the columns to save.</p>
+<p>When the dataset contains tuples, this arguments is the mapping of the
+tuple elements to the columns of the table saved to. If not provided,
+all columns are used.</p>
+<p>When the dataset contains dictionaries, this parameter limits the
+columns save to Cassandra.</p>
+</li>
+<li><strong>keyed_rows</strong> &#8211; bool
+Whether to expect a dataset of dicts (or at least supports the
+__getitem__ protocol with columns names as key) or positional objects
+(e.g. tuples or lists).</li>
+<li><strong>ttl</strong> &#8211; int
+The time to live to use in saving the records.</li>
+<li><strong>timestamp</strong> &#8211; int or datetime.date or datetime.datetime
+The timestamp to use in saving the records.</li>
+<li><strong>contact_points</strong> &#8211; str, tuple, or list
+A string or tuple/list of strings denoting hostnames (contact points)
+of the Cassandra cluster to save to. Defaults to using the ip addresses
+in the BNDL cluster.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Example</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ctx</span><span class="o">.</span><span class="n">collection</span><span class="p">([{</span><span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;val&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span> <span class="p">},</span> <span class="p">{</span><span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;val&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span> <span class="p">},])</span>
+<span class="go">       .cassandra_save(&#39;keyspace&#39;, &#39;table&#39;)</span>
+<span class="go">       .execute()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ctx</span><span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+<span class="go">       .map(lambda i: {&#39;key&#39;: i, &#39;val&#39;: str(i) }</span>
+<span class="go">       .cassandra_save(&#39;keyspace&#39;, &#39;table&#39;)</span>
+<span class="go">       .sum()</span>
+<span class="go">100</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="module-bndl_cassandra.metrics">
+<span id="metrics"></span><h2>Metrics<a class="headerlink" href="#module-bndl_cassandra.metrics" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bndl_cassandra.metrics.get_cassandra_metrics">
+<code class="descclassname">bndl_cassandra.metrics.</code><code class="descname">get_cassandra_metrics</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/metrics.html#get_cassandra_metrics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.metrics.get_cassandra_metrics" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.metrics.combine_metrics">
+<code class="descclassname">bndl_cassandra.metrics.</code><code class="descname">combine_metrics</code><span class="sig-paren">(</span><em>metrics1</em>, <em>metrics2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/metrics.html#combine_metrics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.metrics.combine_metrics" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bndl_cassandra.metrics.metrics_by_cluster">
+<code class="descclassname">bndl_cassandra.metrics.</code><code class="descname">metrics_by_cluster</code><span class="sig-paren">(</span><em>metrics</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bndl_cassandra/metrics.html#metrics_by_cluster"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bndl_cassandra.metrics.metrics_by_cluster" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="issues.html" class="btn btn-neutral float-right" title="Known issues" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="usage.html" class="btn btn-neutral" title="Usage" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; <a href="copyright.html">Copyright</a> 2016, Frens Jan Rumph.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.5.4',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

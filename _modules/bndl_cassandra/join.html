@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>bndl_cassandra.join &mdash; bndl-cassandra 0.5.4 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+        <link rel="copyright" title="Copyright" href="../../copyright.html"/>
+    <link rel="top" title="bndl-cassandra 0.5.4 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> bndl-cassandra
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compatibility.html">Compatibility</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../issues.html">Known issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">bndl-cassandra</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>bndl_cassandra.join</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for bndl_cassandra.join</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">bndl.util.funcs</span> <span class="k">import</span> <span class="n">getter</span><span class="p">,</span> <span class="n">key_or_getter</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra.dataset</span> <span class="k">import</span> <span class="n">_CassandraDataset</span>
+<span class="kn">from</span> <span class="nn">bndl.compute.dataset</span> <span class="k">import</span>  <span class="n">Partition</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">bndl.util.retry</span> <span class="k">import</span> <span class="n">do_with_retry</span>
+<span class="kn">from</span> <span class="nn">bndl_cassandra.session</span> <span class="k">import</span> <span class="n">TRANSIENT_ERRORS</span>
+
+
+<span class="n">QUERY_TEMPLATE</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;select </span><span class="si">{select}</span><span class="s1"> from </span><span class="si">{keyspace}</span><span class="s1">.</span><span class="si">{table}</span><span class="s1"> where </span><span class="si">{where}</span><span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">JOIN_TYPES</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;inner&#39;</span><span class="p">,</span> <span class="s1">&#39;left&#39;</span><span class="p">]</span>
+<span class="n">INNER</span><span class="p">,</span> <span class="n">LEFT</span> <span class="o">=</span> <span class="n">JOIN_TYPES</span>
+
+
+<div class="viewcode-block" id="CassandraJoinDataset"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset">[docs]</a><span class="k">class</span> <span class="nc">CassandraJoinDataset</span><span class="p">(</span><span class="n">_CassandraDataset</span><span class="p">):</span>
+<div class="viewcode-block" id="CassandraJoinDataset.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">keyspace</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">contact_points</span><span class="o">=</span><span class="n">contact_points</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">src</span> <span class="o">=</span> <span class="n">src</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">primary_key</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_primary</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_key</span> <span class="o">=</span> <span class="n">getter</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_join_type</span> <span class="o">=</span> <span class="n">INNER</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_where</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39; and &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> = ?&#39;</span> <span class="o">%</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CassandraJoinDataset.on"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset.on">[docs]</a>    <span class="k">def</span> <span class="nf">on</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Join on particular columns (from the primary key in the Cassandra</span>
+<span class="sd">        table) and set a key to select the corresponding values from the</span>
+<span class="sd">        dataset to join.</span>
+
+<span class="sd">        :param columns: sequence[str], optional</span>
+<span class="sd">            The columns to join on. Must be a left subset of the primary key.</span>
+<span class="sd">            The following must hold: primary_key[:len(columns)] == columns.</span>
+<span class="sd">            When the full primary key is selected, the rows yielded will be</span>
+<span class="sd">            single elements (a dict or namedtuple representing the selected</span>
+<span class="sd">            row). When only part of the primary key is selected (the</span>
+<span class="sd">            partition key columns and perhaps some clustering columns), a list</span>
+<span class="sd">            of selected rows is yielded.</span>
+
+<span class="sd">        :param key: callable(element), list[object] or object, optional</span>
+<span class="sd">            The key for getting the values to query Cassandra with. Must be a</span>
+<span class="sd">            * callable which returns a sequence for each element in this</span>
+<span class="sd">              dataset with the values to use in the join.</span>
+<span class="sd">            * or a list of objects to be used as index in each element</span>
+<span class="sd">              in a toolz.getter(columns) fashion (i.e. using the</span>
+<span class="sd">              __getitem__ protocol)</span>
+<span class="sd">            * or a plain value to be used with the __getitem__ mechanism</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">columns</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">primary_key</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">primary_key</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="p">(</span><span class="n">pk</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">primary_key</span><span class="p">,</span> <span class="n">columns</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">pk</span> <span class="o">!=</span> <span class="n">c</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Column </span><span class="si">%s</span><span class="s1"> at </span><span class="si">%r</span><span class="s1"> not in primary key </span><span class="si">%r</span><span class="s1"> or&#39;</span>
+                                     <span class="s1">&#39; in wrong position&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">primary_key</span><span class="p">))</span>
+            <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;_on&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">columns</span>
+            <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;_on_primary&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">columns</span> <span class="o">==</span> <span class="n">primary_key</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;_key&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">key_or_getter</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_with</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CassandraJoinDataset.inner"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset.inner">[docs]</a>    <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Yield only rows which have a corresponding row in the Cassandra table.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_with</span><span class="p">(</span><span class="n">_join_type</span><span class="o">=</span><span class="n">INNER</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CassandraJoinDataset.left"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset.left">[docs]</a>    <span class="k">def</span> <span class="nf">left</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Yield rows regardless of whether a row was selected from Cassandra.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_with</span><span class="p">(</span><span class="n">_join_type</span><span class="o">=</span><span class="n">LEFT</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CassandraJoinDataset.parts"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinDataset.parts">[docs]</a>    <span class="k">def</span> <span class="nf">parts</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="n">CassandraJoinPartition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">parts</span><span class="p">()</span>
+        <span class="p">]</span></div></div>
+
+
+<div class="viewcode-block" id="CassandraJoinPartition"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinPartition">[docs]</a><span class="k">class</span> <span class="nc">CassandraJoinPartition</span><span class="p">(</span><span class="n">Partition</span><span class="p">):</span>
+<div class="viewcode-block" id="CassandraJoinPartition.__init__"><a class="viewcode-back" href="../../reference.html#bndl_cassandra.join.CassandraJoinPartition.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dset</span><span class="p">,</span> <span class="n">src</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">dset</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">idx</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_compute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">ctx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">ctx</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">_key</span>
+        <span class="n">join_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">_join_type</span>
+        <span class="n">on_primary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">_on_primary</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+
+        <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.read_timeout&#39;</span><span class="p">)</span>
+        <span class="n">retry_count</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.read_retry_count&#39;</span><span class="p">))</span>
+        <span class="n">retry_backoff</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bndl_cassandra.read_retry_backoff&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">_session</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dset</span><span class="o">.</span><span class="n">query</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">key</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+                <span class="n">rows</span> <span class="o">=</span> <span class="n">do_with_retry</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
+                                     <span class="n">retry_count</span><span class="p">,</span> <span class="n">retry_backoff</span><span class="p">,</span> <span class="n">TRANSIENT_ERRORS</span><span class="p">)</span>
+                <span class="n">rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">join_type</span> <span class="o">==</span> <span class="n">INNER</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">on_primary</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">rows</span><span class="p">:</span>
+                        <span class="n">rows</span> <span class="o">=</span> <span class="n">rows</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">rows</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">yield</span> <span class="n">element</span><span class="p">,</span> <span class="n">rows</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; <a href="../../copyright.html">Copyright</a> 2016, Frens Jan Rumph.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.5.4',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
