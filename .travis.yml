@@ -25,6 +25,10 @@ before_install:
   - git clone git://github.com/bndl/bndl.git
   - sudo apt-get install liblapack-dev libopenblas-dev libatlas-base-dev gfortran
   - pip install -e "bndl[dev]"
+  # Workaround for bug #556 in ccm
+  - mkdir -p ~/.ccm/repository/3.9
+  - wget -qO- http://archive.apache.org/dist/cassandra/3.9/apache-cassandra-3.9-bin.tar.gz | tar xvz -C ~/.ccm/repository/3.9 --strip-components=1
+  - echo "3.9" > ~/.ccm/repository/3.9/0.version.txt
 
 install:
   - pip install -e .[dev]
