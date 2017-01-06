@@ -8,11 +8,12 @@ BNDL Cassandra exposes loading from and saving to functionality of the
 
 Master branch build status: |travis| |codecov|
 
-.. |travis| image:: https://travis-ci.org/bndl/bndl_cassandra.svg?branch=master
-   :target: https://travis-ci.org/bndl/bndl_cassandra
+.. |travis| image:: https://travis-ci.org/bndl/cassandra.svg?branch=master
+   :target: https://travis-ci.org/bndl/cassandra
 
-.. |codecov| image:: https://codecov.io/gh/bndl/bndl_cassandra/branch/master/graph/badge.svg
-   :target: https://codecov.io/gh/bndl/bndl_cassandra/branch/master
+.. |codecov| image:: https://codecov.io/gh/bndl/cassandra/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/bndl/cassandra/branch/master
+
 ---------------------------------------------------------------------------------------------------
 
 BNDL Cassandra can be installed through pip::
