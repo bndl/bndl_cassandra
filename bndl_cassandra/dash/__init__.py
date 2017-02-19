@@ -38,7 +38,7 @@ class Dash(dash.Dash):
 
 def _get_metrics():
     metrics = [get_cassandra_metrics()]
-    requests = [worker.execute(get_cassandra_metrics) for worker in g.ctx.workers]
+    requests = [worker.service('tasks').execute(get_cassandra_metrics) for worker in g.ctx.workers]
     for request in requests:
         with catch():
             metrics.append(request.result())
