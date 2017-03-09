@@ -201,6 +201,10 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
             '''check if the session is not closed'''
             return not session.is_shutdown
 
+        create = partial(
+            do_with_retry, partial(create), 1, 2, TRANSIENT_ERRORS
+        )
+
         pools[(contact_points, keyspace)] = pool = ObjectPool(create, check, max_size=4)
 
     # take a session from the pool, yield it to the caller

@@ -79,7 +79,8 @@ class _CassandraDataset(Dataset):
     @functools.lru_cache(1)
     def meta(self):
         with self._session() as session:
-            return get_table_meta(session, self.keyspace, self.table)
+            return do_with_retry(partial(get_table_meta, session, self.keyspace, self.table),
+                                 1, 2, TRANSIENT_ERRORS)
 
     def as_tuples(self):
         return self._with(_row_factory=tuple_factory)
