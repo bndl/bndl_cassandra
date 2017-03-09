@@ -11,9 +11,11 @@
 # limitations under the License.
 
 from functools import partial
+from itertools import chain
 import difflib
 import functools
 import logging
+import time
 
 from cassandra import protocol
 from cassandra.protocol import ErrorMessage
@@ -22,7 +24,8 @@ from cassandra.query import tuple_factory, named_tuple_factory, dict_factory
 from bndl.compute.dataset import Dataset, Partition, NODE_LOCAL
 from bndl.util import funcs
 from bndl.util.callsite import callsite
-from bndl.util.retry import do_with_retry
+from bndl.util.funcs import prefetch
+from bndl.util.retry import do_with_retry, retry_delay
 from bndl_cassandra import partitioner
 from bndl_cassandra.coscan import CassandraCoScanDataset
 from bndl_cassandra.session import TRANSIENT_ERRORS
@@ -320,45 +323,64 @@ class CassandraScanPartition(Partition):
         self.size_estimate_keys = size_estimate_keys
 
 
-    def _fetch_token_range(self, session, token_range):
-        try:
-            query = session.prepare(self.dset.query)
-        except ErrorMessage as exc:
-            raise Exception('Unable to prepare query %s, error: %s' % (self.dset.query, str(exc)))
-
-        query.consistency_level = self.dset.ctx.conf.get('bndl_cassandra.read_consistency_level')
-        query.replicas = self.replicas
-
-        if logger.isEnabledFor(logging.INFO):
-            logger.info('executing query %s for token_range %s', query.query_string.replace('\n', ''), token_range)
-
-        timeout = self.dset.ctx.conf.get('bndl_cassandra.read_timeout')
-        params = token_range + self.dset._where_values
-        resultset = session.execute(query, params, timeout=timeout)
-
-        results = []
-        while True:
-            has_more = resultset.response_future.has_more_pages
-            if has_more:
-                resultset.response_future.start_fetching_next_page()
-            results.extend(resultset.current_rows)
-            if has_more:
-                resultset = resultset.response_future.result()
-            else:
-                break
-
-        return results
-
-
     def _compute(self):
         retry_count = max(0, self.dset.ctx.conf.get('bndl_cassandra.read_retry_count'))
         retry_backoff = self.dset.ctx.conf.get('bndl_cassandra.read_retry_backoff')
 
+        timeout = self.dset.ctx.conf.get('bndl_cassandra.read_timeout')
+        consistency_level = self.dset.ctx.conf.get('bndl_cassandra.read_consistency_level')
+
         with self.dset._session() as session:
             logger.debug('scanning %s token ranges', len(self.token_ranges))
+
+            try:
+                query = session.prepare(self.dset.query)
+            except ErrorMessage as exc:
+                raise Exception('Unable to prepare query %s' % self.dset.query) from exc
+
+            query.consistency_level = consistency_level
+            query.replicas = self.replicas
+
             for token_range in self.token_ranges:
-                yield from do_with_retry(partial(self._fetch_token_range, session, token_range),
-                                         retry_count, retry_backoff, TRANSIENT_ERRORS)
+                if logger.isEnabledFor(logging.INFO):
+                    logger.info('executing query %s for token_range %s',
+                                query.query_string.replace('\n', ''), token_range)
+
+                params = token_range + self.dset._where_values
+                execute_async = partial(session.execute_async, query, params, timeout=timeout)
+
+                # perform initial query without paging_state
+                paging_state = None
+                future = execute_async()
+
+                # no. (transient) failures must be <= retry_count
+                fails = 0
+
+                while True:
+                    try:
+                        # wait for previous page
+                        result_set = future.result()
+                        paging_state = result_set.paging_state
+                    except TRANSIENT_ERRORS:
+                        # handle transient errors (check max no. retries, possibly back-off with
+                        # sleep and execute query for current page again)
+                        fails += 1
+                        if not retry_count or fails > retry_count:
+                            raise
+                        elif retry_backoff:
+                            sleep = retry_delay(retry_backoff, fails)
+                            time.sleep(sleep)
+
+                        future = execute_async(paging_state=paging_state)
+                    else:
+                        if paging_state:
+                            # start fetch of next page (if any)
+                            future = execute_async(paging_state=paging_state)
+                        # hand of current page
+                        yield from result_set.current_rows
+                        # stop if no more pages left
+                        if not paging_state:
+                            break
 
 
     def _locality(self, workers):

@@ -40,7 +40,7 @@ setup(
 
     install_requires=[
         'bndl>=0.5.0',
-        'cassandra-driver',
+        'cassandra-driver>=3.7.0',
         'lz4',
         'scales',
     ],
