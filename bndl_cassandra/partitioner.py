@@ -59,7 +59,61 @@ class Bin(object):
         self.size = 0
 
 
-def partition_ranges_(ranges, max_length, size_estimate):
+def partition_ranges(ctx, contact_points, keyspace, table=None, size_estimates=None):
+    max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
+    max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
+
+    return _partition_ranges(ctx, contact_points, keyspace, max_size_mb, max_size_keys,
+                     table, size_estimates)
+
+
+
+@lru_cache()
+def _partition_ranges(ctx, contact_points, keyspace, max_size_mb, max_size_keys,
+                      table, size_estimates):
+    assert table or size_estimates
+    with cassandra_session(ctx, contact_points=contact_points) as session:
+        # estimate size of table
+        size_estimate = size_estimates or estimate_size(session, keyspace, table)
+
+        # calculate a maximum length of a partition
+        # while the ratio of size in megabytes and keys may vary across the tokens
+        # we use the average sizes per token for both to simplify the problem
+        # to 1d bin packing (instead of vector bin packing)
+        max_length = T_COUNT / ctx.default_pcount
+        if size_estimate.token_size_mb:
+            max_length = min(max_length, max_size_mb / size_estimate.token_size_mb)
+        if size_estimate.token_size_keys:
+            max_length = min(max_length, max_size_keys / size_estimate.token_size_keys)
+
+        # get token ranges, grouped by replica set
+        by_replicas = ranges_by_replicas(session, keyspace)
+
+    # container for the partitions (replica, ranges, size_mb, size_keys)
+    partitions = []
+
+    # divide the token ranges in partitions, joining ranges for the same replica set
+    # but limited in size (in bytes and Cassandra partition keys)
+    # A greedy bin packing algorithm is used
+
+    for replicas, ranges in sorted(by_replicas.items(), key=itemgetter(0)):
+        ranges = itertoolz.pluck([1, 2], ranges)
+        partitioned = _partition_replica_ranges(tuple(ranges), max_length, size_estimate)
+        for ranges, size in partitioned:
+            partitions.append((
+                replicas, ranges,
+                size * size_estimate.token_size_mb,
+                size * size_estimate.token_size_keys
+            ))
+
+    # shuffle the partitions so that load is spread over the replica sets
+    # use a fixed seed so that the 'randomness' is fixed
+    random.Random(42).shuffle(partitions)
+
+    return partitions
+
+
+def _partition_replica_ranges(ranges, max_length, size_estimate):
     # split ranges such that they are small enough
     # ranges which need to be split are yielded immediately, they'd fill a bin anyway
     # the ranges smaller than max_length are put into a list for binning
@@ -104,52 +158,6 @@ def partition_ranges_(ranges, max_length, size_estimate):
             partitioned.append((bin.ranges, bin.size))
 
     return partitioned
-
-
-@lru_cache()
-def partition_ranges(ctx, contact_points, keyspace, table=None, size_estimates=None):
-    assert table or size_estimates
-    with cassandra_session(ctx, contact_points=contact_points) as session:
-        # estimate size of table
-        size_estimate = size_estimates or estimate_size(session, keyspace, table)
-
-        # calculate a maximum length of a partition
-        # while the ratio of size in megabytes and keys may vary across the tokens
-        # we use the average sizes per token for both to simplify the problem
-        # to 1d bin packing (instead of vector bin packing)
-        max_size_mb = ctx.conf.get('bndl_cassandra.part_size_mb')
-        max_size_keys = ctx.conf.get('bndl_cassandra.part_size_keys')
-        max_length = T_COUNT / ctx.default_pcount
-        if size_estimate.token_size_mb:
-            max_length = min(max_length, max_size_mb / size_estimate.token_size_mb)
-        if size_estimate.token_size_keys:
-            max_length = min(max_length, max_size_keys / size_estimate.token_size_keys)
-
-        # get token ranges, grouped by replica set
-        by_replicas = ranges_by_replicas(session, keyspace)
-
-    # container for the partitions (replica, ranges, size_mb, size_keys)
-    partitions = []
-
-    # divide the token ranges in partitions, joining ranges for the same replica set
-    # but limited in size (in bytes and Cassandra partition keys)
-    # A greedy bin packing algorithm is used
-
-    for replicas, ranges in sorted(by_replicas.items(), key=itemgetter(0)):
-        ranges = itertoolz.pluck([1, 2], ranges)
-        partitioned = partition_ranges_(tuple(ranges), max_length, size_estimate)
-        for ranges, size in partitioned:
-            partitions.append((
-                replicas, ranges,
-                size * size_estimate.token_size_mb,
-                size * size_estimate.token_size_keys
-            ))
-
-    # shuffle the partitions so that load is spread over the replica sets
-    # use a fixed seed so that the 'randomness' is fixed
-    random.Random(42).shuffle(partitions)
-
-    return partitions
 
 
 

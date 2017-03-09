@@ -10,5 +10,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-info = (0, 5, 4)
+info = (0, 6, 1)
 version = '.'.join(map(str, info))
