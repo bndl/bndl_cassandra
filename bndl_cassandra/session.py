@@ -18,13 +18,16 @@ import queue
 import random
 
 from cassandra import OperationTimedOut, ReadTimeout, WriteTimeout, CoordinationFailure, Unavailable
-from cassandra.cluster import Cluster, Session
+from cassandra.cluster import Cluster, Session, NoHostAvailable
 from cassandra.policies import DCAwareRoundRobinPolicy, HostDistance, TokenAwarePolicy
 
 from bndl.util.pool import ObjectPool
+from bndl.util.retry import do_with_retry
 
 
-TRANSIENT_ERRORS = (Unavailable, ReadTimeout, WriteTimeout, OperationTimedOut, CoordinationFailure)
+TRANSIENT_ERRORS = (NoHostAvailable, Unavailable,
+                    ReadTimeout, WriteTimeout,
+                    OperationTimedOut, CoordinationFailure)
 
 
 class LocalNodeFirstPolicy(TokenAwarePolicy):
