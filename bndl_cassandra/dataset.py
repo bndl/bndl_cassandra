@@ -327,6 +327,7 @@ class CassandraScanPartition(Partition):
             raise Exception('Unable to prepare query %s, error: %s' % (self.dset.query, str(exc)))
 
         query.consistency_level = self.dset.ctx.conf.get('bndl_cassandra.read_consistency_level')
+        query.replicas = self.replicas
 
         if logger.isEnabledFor(logging.INFO):
             logger.info('executing query %s for token_range %s', query.query_string.replace('\n', ''), token_range)

@@ -15,24 +15,32 @@ from functools import lru_cache, partial
 from threading import Lock
 import contextlib
 import queue
+import random
 
-from bndl.util.pool import ObjectPool
 from cassandra import OperationTimedOut, ReadTimeout, WriteTimeout, CoordinationFailure, Unavailable
 from cassandra.cluster import Cluster, Session
 from cassandra.policies import DCAwareRoundRobinPolicy, HostDistance, TokenAwarePolicy
+
+from bndl.util.pool import ObjectPool
 
 
 TRANSIENT_ERRORS = (Unavailable, ReadTimeout, WriteTimeout, OperationTimedOut, CoordinationFailure)
 
 
 class LocalNodeFirstPolicy(TokenAwarePolicy):
-    def __init__(self, child_policy, local_hosts):
-        super().__init__(child_policy)
+    def __init__(self, local_hosts):
+        super().__init__(DCAwareRoundRobinPolicy())
         self._local_hosts = local_hosts
+        self._hosts = {}
 
 
     def is_node_local(self, host):
         return host.address in self._local_hosts
+
+
+    def populate(self, cluster, hosts):
+        self._hosts = {h.address:h for h in hosts if h.is_up}
+        super().populate(cluster, hosts)
 
 
     def make_query_plan(self, working_keyspace=None, query=None):
@@ -46,6 +54,27 @@ class LocalNodeFirstPolicy(TokenAwarePolicy):
             for host in child.make_query_plan(keyspace, query):
                 yield host
         else:
+            used = set()
+
+            # if replica addresses are set on the prepared_statement, use these first
+            prepared_statement = getattr(query, 'prepared_statement', None)
+            replicas = getattr(prepared_statement, 'replicas', None)
+            if replicas:
+                # shuffle to avoid hitting on the same node over and over again
+                replicas = list(replicas)
+                random.shuffle(replicas)
+                # yield the replicas (if known and up)
+                for replica in replicas:
+                    try:
+                        host = self._hosts.get(replica)
+                        if host and host.is_up:
+                            used.add(host)
+                            yield host
+                    except KeyError:
+                        pass
+
+            # use the dc aware round robin policy if there is no routing key
+            # other wise use the routing key to resolve the right replicas
             routing_key = query.routing_key
             if routing_key is None or keyspace is None:
                 for host in child.make_query_plan(keyspace, query):
@@ -54,20 +83,41 @@ class LocalNodeFirstPolicy(TokenAwarePolicy):
                 replicas = [replica for replica in
                             self._cluster_metadata.get_replicas(keyspace, routing_key)
                             if replica.is_up]
-                
+
+                # prefer a replica which is local (share IP address)
                 for replica in replicas:
                     if self.is_node_local(replica):
                         yield replica
 
+                # dc-local replica's on other machines
                 for replica in replicas:
-                    # local replica's on other machines
                     if child.distance(replica) == HostDistance.LOCAL and not self.is_node_local(replica):
                         yield replica
 
+                used.update(replicas)
+
+                # fall back to dc-aware round robin for other hosts (e.g. on network partition)
                 for host in child.make_query_plan(keyspace, query):
                     # skip if we've already listed this host
-                    if host not in replicas or child.distance(host) == HostDistance.REMOTE:
+                    if host not in used or child.distance(host) == HostDistance.REMOTE:
                         yield host
+
+#
+    def on_up(self, host):
+        self._hosts[host.address] = host
+        return super().on_up(host)
+
+    def on_down(self, host):
+        self._hosts.pop(host.address, None)
+        return super().on_down(host)
+
+    def on_add(self, host):
+        self._hosts[host.address] = host
+        return super().on_add(host)
+
+    def on_remove(self, host):
+        self._hosts.pop(host.address, None)
+        return super().on_remove(host)
 
 
 _PREPARE_LOCK = Lock()
@@ -128,7 +178,7 @@ def cassandra_session(ctx, keyspace=None, contact_points=None,
                 contact_points,
                 port=ctx.conf.get('bndl_cassandra.port'),
                 compression=ctx.conf.get('bndl_cassandra.compression'),
-                load_balancing_policy=LocalNodeFirstPolicy(DCAwareRoundRobinPolicy(), ctx.node.ip_addresses()),
+                load_balancing_policy=LocalNodeFirstPolicy(ctx.node.ip_addresses()),
                 metrics_enabled=ctx.conf.get('bndl_cassandra.metrics_enabled'),
             )
 
