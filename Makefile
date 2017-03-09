@@ -28,7 +28,7 @@ codestyle:
 
 
 install-cassandra:
-	ccm list | grep bndl_test || ccm create bndl_test -v binary:$(CASSANDRA_VERSION) -n 1
+	ccm list | grep bndl_test || ccm create bndl_test -v binary:$(CASSANDRA_VERSION) -n 3
 
 start-cassandra: install-cassandra
 	ccm switch bndl_test
