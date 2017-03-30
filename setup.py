@@ -39,7 +39,7 @@ setup(
     zip_safe=False,
 
     install_requires=[
-        'bndl>=0.5.0',
+        'bndl>=0.5.3',
         'cassandra-driver>=3.7.0',
         'lz4',
         'scales',

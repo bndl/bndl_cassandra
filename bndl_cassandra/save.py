@@ -17,7 +17,7 @@ from threading import Condition
 import logging
 
 from bndl.util.retry import retry_delay
-from bndl.util.timestamps import ms_timestamp
+from bndl.util.timestamps import timestamp_micros
 from bndl_cassandra.session import cassandra_session, TRANSIENT_ERRORS
 from cassandra.query import BatchStatement, BatchType, BoundStatement
 
@@ -287,7 +287,7 @@ def cassandra_save(dataset, keyspace, table, columns=None, keyed_rows=True,
             using.append('ttl ' + str(ttl))
         if timestamp:
             if isinstance(timestamp, (date, datetime)):
-                timestamp = ms_timestamp(timestamp)
+                timestamp = timestamp_micros(timestamp)
             using.append('timestamp ' + str(timestamp))
         using = ' using ' + ' and '.join(using)
     else:
